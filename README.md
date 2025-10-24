@@ -8,4 +8,5 @@ MünzScan is provided for educational and personal use only.
 
 Not for commercial use.
 
-Redistribution, modification, or deployment for profit or in commercial environments is prohibited without explicit permission.
+# Unauthorized Use Prohibited
+Redistribution, modification, or deployment of this software for commercial purposes —including use in profit-generating environments— is strictly prohibited without prior written consent. Violations may result in legal action and financial penalties.
