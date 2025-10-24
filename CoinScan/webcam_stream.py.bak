@@ -1,137 +1,69 @@
 # -*- coding: utf-8 -*-
-
 # webcam_stream.py
 
-
-
 import cv2
-
 import threading
-
 from PIL import Image, ImageTk
-
 import shutil
-
-
-
 
 
 shutil.copy2("webcam_stream.py", "webcam_stream.py.bak")  # backup
 
-
-
 with open("webcam_stream.py", "rb") as f:
-
     raw = f.read()
 
-
-
 # Try decoding with the likely encoding (e.g., cp1252); adjust if needed
-
 text = raw.decode("cp1252")
 
-
-
 with open("webcam_stream.py", "w", encoding="utf-8") as f:
-
     f.write(text)
 
 
-
-
-
 def update_recognition(
-
     scan_button, recognition, total_label, webcam_label, current_size, current_lang
-
 ):
-
     scan_button.config(state="disabled")
 
-
-
     def stream():
-
         cap = cv2.VideoCapture(0)
-
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, current_size[0])
-
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, current_size[1])
 
-
-
         if not cap.isOpened():
-
             msg = (
-
-                "Webcam nicht verfÃ¼gbar."
-
+                "Webcam nicht verfügbar."
                 if current_lang == "de"
-
                 else "Webcam not available."
-
             )
-
             recognition.insert(0, msg)
-
             scan_button.config(state="normal")
-
             return
 
-
-
         while cap.isOpened():
-
             ret, frame = cap.read()
-
             if not ret:
-
                 break
 
-
-
-            coins = [("EURO", "1â‚¬", "â‚¬"), ("EURO", "5 ct", "5")]
-
+            coins = [("EURO", "1€", "€"), ("EURO", "5 ct", "5")]
             recognition.delete(0, "end")
-
             for currency, value, symbol in coins:
-
                 recognition.insert("end", f"{currency} | {value} | {symbol}")
 
-
-
             total = 1.00 + 0.05
-
             total_text = (
-
-                f"GESAMT: {total:.2f} â‚¬"
-
+                f"GESAMT: {total:.2f} €"
                 if current_lang == "de"
-
-                else f"TOTAL: â‚¬{total:.2f}"
-
+                else f"TOTAL: €{total:.2f}"
             )
-
             total_label.config(text=total_text)
 
-
-
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
             img = Image.fromarray(frame_rgb).resize(current_size)
-
             imgtk = ImageTk.PhotoImage(image=img)
-
             webcam_label.imgtk = imgtk
-
             webcam_label.configure(image=imgtk)
 
-
-
         cap.release()
-
         scan_button.config(state="normal")
-
-
 
     threading.Thread(target=stream, daemon=True).start()
