@@ -1,14 +1,33 @@
-﻿from PIL import Image, ImageTk
+﻿# -*- coding: utf-8 -*-
+# main.py
+
 import tkinter as tk
-import cv2
-import threading
+from ui_config import UI_FONT, TITLE_FONT, MONO_FONT, BUTTON_STYLE, on_enter, on_leave
+from language import LANGUAGES, switch_language
+from webcam_stream import update_recognition
 
-# Global preview size
 current_size = (320, 240)
+current_lang = "de"
 
 
-# Center the window
-def center_windowframe():
+def toggle_size(scan_button, size_button):
+    global current_size
+    strings = LANGUAGES[current_lang]
+    if scan_button["state"] == "disabled":
+        return
+    if current_size == (320, 240):
+        current_size = (640, 480)
+        size_button.config(text=strings["size_minus"])
+    else:
+        current_size = (320, 240)
+        size_button.config(text=strings["size_plus"])
+
+
+def exit_program(root):
+    root.destroy()
+
+
+def center_windowframe(root):
     root.update_idletasks()
     width = root.winfo_width()
     height = root.winfo_height()
@@ -17,104 +36,104 @@ def center_windowframe():
     root.geometry(f"{width}x{height}+{x}+{y}")
 
 
-# Exit Program
-def exit_program():
-    root.destroy()
-
-
-# Toggle webcam preview size
-def toggle_size():
-    global current_size
-    if current_size == (320, 240):
-        current_size = (640, 480)
-        size_button.config(text="-")
-    else:
-        current_size = (320, 240)
-        size_button.config(text="+")
-
-
-# Webcam + recognition stream
-def update_recognition():
-    def stream():
-        cap = cv2.VideoCapture(0)
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, current_size[0])
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, current_size[1])
-
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                break
-
-            # Simulate recognition logic
-            coins = [("EURO", "1€", "€"), ("EURO", "5 ct", "5")]
-            recognition.delete(0, tk.END)
-            for currency, value, symbol in coins:
-                recognition.insert(tk.END, f"{currency} | {value} | {symbol}")
-            total_label.config(text="GESAMT: 1,05 €")
-
-            # Convert frame to RGB and resize
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            img = Image.fromarray(frame_rgb).resize(current_size)
-            imgtk = ImageTk.PhotoImage(image=img)
-            webcam_label.imgtk = imgtk
-            webcam_label.configure(image=imgtk)
-
-        cap.release()
-
-    threading.Thread(target=stream, daemon=True).start()
-
-
-# Main GUI
 def main():
-    global root, recognition, total_label, webcam_label, size_button
+    global current_lang, current_size
 
     root = tk.Tk()
     root.title("MünzScan")
     root.geometry("500x500")
 
-    # Sidebar
     sidebar = tk.Frame(root, bg="#2c3e50", width=60)
     sidebar.pack(side="left", fill="y")
-
     for icon in ["🏠", "⚙️", "⬇️"]:
-        btn = tk.Button(sidebar, text=icon, bg="#2c3e50", fg="white", relief="flat")
+        btn = tk.Button(
+            sidebar, text=icon, bg="#2c3e50", fg="white", relief="flat", font=UI_FONT
+        )
         btn.pack(pady=10)
+        btn.bind("<Enter>", on_enter)
+        btn.bind("<Leave>", on_leave)
 
-    # Main content
     content = tk.Frame(root, bg="white")
     content.pack(side="right", expand=True, fill="both")
 
-    title = tk.Label(content, text="LIVE SCAN", font=("Arial", 14), bg="white")
-    title.pack(pady=10)
+    lang_frame = tk.Frame(content, bg="white")
+    lang_frame.pack(pady=5)
 
-    # Webcam + size button in one row
+    widgets = {}
+
+    for code, flag in [("de", "🇩🇪"), ("en", "🇬🇧")]:
+        lang_btn = tk.Button(
+            lang_frame,
+            text=flag,
+            command=lambda c=code: switch_language(c, widgets, current_size),
+            **BUTTON_STYLE,
+        )
+        lang_btn.pack(side="left", padx=5)
+        lang_btn.bind("<Enter>", on_enter)
+        lang_btn.bind("<Leave>", on_leave)
+
+    widgets["title"] = tk.Label(
+        content, text=LANGUAGES[current_lang]["title"], font=TITLE_FONT, bg="white"
+    )
+    widgets["title"].pack(pady=10)
+
     webcam_row = tk.Frame(content, bg="white")
     webcam_row.pack(pady=5)
 
-    webcam_label = tk.Label(webcam_row, bg="black")
-    webcam_label.pack(side="left", padx=5)
+    widgets["webcam_label"] = tk.Label(webcam_row, bg="black")
+    widgets["webcam_label"].pack(side="left", padx=5)
 
-    size_button = tk.Button(webcam_row, text="+", command=toggle_size)
-    size_button.pack(side="left", padx=5)
-
-    recognition = tk.Listbox(content, font=("Courier", 10), height=5)
-    recognition.pack(pady=5)
-
-    total_label = tk.Label(
-        content, text="GESAMT: 0,00 €", font=("Arial", 12), bg="white"
+    widgets["size_button"] = tk.Button(
+        webcam_row,
+        text=LANGUAGES[current_lang]["size_plus"],
+        command=lambda: toggle_size(widgets["scan_button"], widgets["size_button"]),
+        **BUTTON_STYLE,
     )
-    total_label.pack(pady=10)
+    widgets["size_button"].pack(side="left", padx=5)
+    widgets["size_button"].bind("<Enter>", on_enter)
+    widgets["size_button"].bind("<Leave>", on_leave)
 
-    scan_button = tk.Button(content, text="Scan Coins", command=update_recognition)
-    scan_button.pack(pady=5)
+    widgets["recognition"] = tk.Listbox(content, font=MONO_FONT, height=5)
+    widgets["recognition"].pack(pady=5)
 
-    exit_button = tk.Button(content, text="Exit", command=exit_program)
-    exit_button.pack(pady=5)
+    widgets["total_label"] = tk.Label(
+        content, text=LANGUAGES[current_lang]["total"], font=UI_FONT, bg="white"
+    )
+    widgets["total_label"].pack(pady=10)
 
-    center_windowframe()
+    button_frame = tk.Frame(content, bg="white")
+    button_frame.pack(pady=10)
+
+    widgets["scan_button"] = tk.Button(
+        button_frame,
+        text=LANGUAGES[current_lang]["scan"],
+        command=lambda: update_recognition(
+            widgets["scan_button"],
+            widgets["recognition"],
+            widgets["total_label"],
+            widgets["webcam_label"],
+            current_size,
+            current_lang,
+        ),
+        **BUTTON_STYLE,
+    )
+    widgets["scan_button"].pack(side="left", padx=5)
+    widgets["scan_button"].bind("<Enter>", on_enter)
+    widgets["scan_button"].bind("<Leave>", on_leave)
+
+    widgets["exit_button"] = tk.Button(
+        button_frame,
+        text=LANGUAGES[current_lang]["exit"],
+        command=lambda: exit_program(root),
+        **BUTTON_STYLE,
+    )
+    widgets["exit_button"].pack(side="left", padx=5)
+    widgets["exit_button"].bind("<Enter>", on_enter)
+    widgets["exit_button"].bind("<Leave>", on_leave)
+
+    center_windowframe(root)
     root.mainloop()
 
 
-# Run
 if __name__ == "__main__":
     main()
