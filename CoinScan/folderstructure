@@ -1,0 +1,5 @@
+﻿MünzScan/
+├── main.py				(CoinScan Hauptprogramm)
+├── ui_config.py		(Benutzeroberflächen-Konfiguration)
+├── language.py			(Sprachunterstützung)
+├── webcam_stream.py	(Webcam-Streaming-Funktionalität)
