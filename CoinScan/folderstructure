@@ -1,7 +1,10 @@
 ﻿MünzScan/
-├── main.py				(CoinScan Hauptprogramm)
-├── ui_config.py		(Benutzeroberflächen-Konfiguration)
-├── language.py			(Sprachunterstützung)
-├── webcam_stream.py	(Webcam-Streaming-Funktionalität)
-├── flag_de.png			(Deutsche Flagge)
-├── flag_en.png			(Englische Flagge)
+├── main.py						# Main application launcher with GUI
+├── ui_config.py				# Fonts, styles, hover effects
+├── language.py					# Multilingual strings and switch logic
+├── webcam_stream.py			# Webcam capture and coin recognition
+├── flagicon/					# Folder for flag icons
+│   ├── flag_DE.png				# German flag icon (24x24 or 32x32)
+│   └── flag_UK.png				# UK flag icon (24x24 or 32x32)
+├── README.md					# Optional: project overview and setup instructions
+├── requirements.txt			# Optional: list of dependencies (e.g. opencv-python, Pillow)
