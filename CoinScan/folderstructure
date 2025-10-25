@@ -3,3 +3,5 @@
 ├── ui_config.py		(Benutzeroberflächen-Konfiguration)
 ├── language.py			(Sprachunterstützung)
 ├── webcam_stream.py	(Webcam-Streaming-Funktionalität)
+├── flag_de.png			(Deutsche Flagge)
+├── flag_en.png			(Englische Flagge)
