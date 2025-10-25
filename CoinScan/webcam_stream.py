@@ -1,137 +1,62 @@
-# -*- coding: utf-8 -*-
-
-# webcam_stream.py
-
-
-
-import cv2
-
-import threading
-
-from PIL import Image, ImageTk
-
-import shutil
-
-
-
-
-
-shutil.copy2("webcam_stream.py", "webcam_stream.py.bak")  # backup
-
-
-
-with open("webcam_stream.py", "rb") as f:
-
-    raw = f.read()
-
-
-
-# Try decoding with the likely encoding (e.g., cp1252); adjust if needed
-
-text = raw.decode("cp1252")
-
-
-
-with open("webcam_stream.py", "w", encoding="utf-8") as f:
-
-    f.write(text)
-
-
-
-
-
-def update_recognition(
-
-    scan_button, recognition, total_label, webcam_label, current_size, current_lang
-
-):
-
-    scan_button.config(state="disabled")
-
-
-
-    def stream():
-
-        cap = cv2.VideoCapture(0)
-
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, current_size[0])
-
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, current_size[1])
-
-
-
-        if not cap.isOpened():
-
-            msg = (
-
-                "Webcam nicht verfÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¼gbar."
-
-                if current_lang == "de"
-
-                else "Webcam not available."
-
-            )
-
-            recognition.insert(0, msg)
-
-            scan_button.config(state="normal")
-
-            return
-
-
-
-        while cap.isOpened():
-
-            ret, frame = cap.read()
-
-            if not ret:
-
-                break
-
-
-
-            coins = [("EURO", "1ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬", "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬"), ("EURO", "5 ct", "5")]
-
-            recognition.delete(0, "end")
-
-            for currency, value, symbol in coins:
-
-                recognition.insert("end", f"{currency} | {value} | {symbol}")
-
-
-
-            total = 1.00 + 0.05
-
-            total_text = (
-
-                f"GESAMT: {total:.2f} ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬"
-
-                if current_lang == "de"
-
-                else f"TOTAL: ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬{total:.2f}"
-
-            )
-
-            total_label.config(text=total_text)
-
-
-
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-            img = Image.fromarray(frame_rgb).resize(current_size)
-
-            imgtk = ImageTk.PhotoImage(image=img)
-
-            webcam_label.imgtk = imgtk
-
-            webcam_label.configure(image=imgtk)
-
-
-
-        cap.release()
-
-        scan_button.config(state="normal")
-
-
-
+# -*- coding: utf-8 -*-
+# webcam_stream.py
+
+import cv2
+import threading
+
+from PIL import Image, ImageTk
+
+
+def update_recognition(
+    scan_button, recognition, total_label, webcam_label, current_size, current_lang
+):
+    scan_button.config(state="disabled")
+
+    def stream():
+        cap = cv2.VideoCapture(0)
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, current_size[0])
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, current_size[1])
+
+        if not cap.isOpened():
+            msg = (
+                "Webcam nicht verfügbar."
+                if current_lang == "de"
+                else "Webcam not available."
+            )
+
+            recognition.insert(0, msg)
+            scan_button.config(state="normal")
+            return
+
+        while cap.isOpened():
+            ret, frame = cap.read()
+
+            if not ret:
+                break
+
+            # Dummy coin data
+            coins = [("EURO", "1€", "€"), ("EURO", "5 ct", "5")]
+            recognition.delete(0, "end")
+
+            for currency, value, symbol in coins:
+                recognition.insert("end", f"{currency} | {value} | {symbol}")
+
+            total = 1.00 + 0.05
+            total_text = (
+                f"GESAMT: {total:.2f} €"
+                if current_lang == "de"
+                else f"TOTAL: €{total:.2f}"
+            )
+
+            total_label.config(text=total_text)
+
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            img = Image.fromarray(frame_rgb).resize(current_size)
+            imgtk = ImageTk.PhotoImage(image=img)
+            webcam_label.imgtk = imgtk
+            webcam_label.configure(image=imgtk)
+
+        cap.release()
+        scan_button.config(state="normal")
+
     threading.Thread(target=stream, daemon=True).start()

@@ -2,6 +2,7 @@
 # main.py
 
 import tkinter as tk
+
 from PIL import Image, ImageTk
 from ui_config import UI_FONT, TITLE_FONT, MONO_FONT, BUTTON_STYLE, on_enter, on_leave
 from language import LANGUAGES, switch_language
@@ -10,9 +11,11 @@ from webcam_stream import update_recognition
 current_size = (320, 240)
 current_lang = "de"
 
+
 def toggle_size(scan_button, size_button):
     global current_size
     strings = LANGUAGES[current_lang]
+
     if scan_button["state"] == "disabled":
         return
     if current_size == (320, 240):
@@ -22,8 +25,10 @@ def toggle_size(scan_button, size_button):
         current_size = (320, 240)
         size_button.config(text=strings["size_plus"])
 
+
 def exit_program(root):
     root.destroy()
+
 
 def center_windowframe(root):
     root.update_idletasks()
@@ -32,6 +37,7 @@ def center_windowframe(root):
     x = (root.winfo_screenwidth() // 2) - (width // 2)
     y = (root.winfo_screenheight() // 2) - (height // 2)
     root.geometry(f"{width}x{height}+{x}+{y}")
+
 
 def main():
     global current_lang, current_size
@@ -42,8 +48,12 @@ def main():
 
     sidebar = tk.Frame(root, bg="#2c3e50", width=60)
     sidebar.pack(side="left", fill="y")
+
     for icon in ["🏠", "⚙️", "⬇️"]:
-        btn = tk.Button(sidebar, text=icon, bg="#2c3e50", fg="white", relief="flat", font=UI_FONT)
+        btn = tk.Button(
+            sidebar, text=icon, bg="#2c3e50", fg="white", relief="flat", font=UI_FONT
+        )
+
         btn.pack(pady=10)
         btn.bind("<Enter>", on_enter)
         btn.bind("<Leave>", on_leave)
@@ -69,12 +79,16 @@ def main():
             command=lambda c=code: switch_language(c, widgets, current_size),
             **BUTTON_STYLE,
         )
+
         lang_btn.image = flag_images[code]  # Prevent garbage collection
         lang_btn.pack(side="left", padx=5)
         lang_btn.bind("<Enter>", on_enter)
         lang_btn.bind("<Leave>", on_leave)
 
-    widgets["title"] = tk.Label(content, text=LANGUAGES[current_lang]["title"], font=TITLE_FONT, bg="white")
+    widgets["title"] = tk.Label(
+        content, text=LANGUAGES[current_lang]["title"], font=TITLE_FONT, bg="white"
+    )
+
     widgets["title"].pack(pady=10)
 
     webcam_row = tk.Frame(content, bg="white")
@@ -89,6 +103,7 @@ def main():
         command=lambda: toggle_size(widgets["scan_button"], widgets["size_button"]),
         **BUTTON_STYLE,
     )
+
     widgets["size_button"].pack(side="left", padx=5)
     widgets["size_button"].bind("<Enter>", on_enter)
     widgets["size_button"].bind("<Leave>", on_leave)
@@ -96,7 +111,10 @@ def main():
     widgets["recognition"] = tk.Listbox(content, font=MONO_FONT, height=5)
     widgets["recognition"].pack(pady=5)
 
-    widgets["total_label"] = tk.Label(content, text=LANGUAGES[current_lang]["total"], font=UI_FONT, bg="white")
+    widgets["total_label"] = tk.Label(
+        content, text=LANGUAGES[current_lang]["total"], font=UI_FONT, bg="white"
+    )
+
     widgets["total_label"].pack(pady=10)
 
     button_frame = tk.Frame(content, bg="white")
@@ -115,6 +133,7 @@ def main():
         ),
         **BUTTON_STYLE,
     )
+
     widgets["scan_button"].pack(side="left", padx=5)
     widgets["scan_button"].bind("<Enter>", on_enter)
     widgets["scan_button"].bind("<Leave>", on_leave)
@@ -125,12 +144,14 @@ def main():
         command=lambda: exit_program(root),
         **BUTTON_STYLE,
     )
+
     widgets["exit_button"].pack(side="left", padx=5)
     widgets["exit_button"].bind("<Enter>", on_enter)
     widgets["exit_button"].bind("<Leave>", on_leave)
 
     center_windowframe(root)
     root.mainloop()
+
 
 if __name__ == "__main__":
     main()
