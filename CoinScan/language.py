@@ -1,8 +1,9 @@
 ﻿# -*- coding: utf-8 -*-
 # language.py
 
+# Dictionary containing UI strings for supported languages (German and English)
 LANGUAGES = {
-    "de": {
+    "de": {  # German translations
         "title": "LIVE SCAN",
         "scan": "🔍 Münzen scannen",
         "exit": "❌ Programm Beenden",
@@ -12,7 +13,7 @@ LANGUAGES = {
         "exit_dialog_title": "Beenden",
         "exit_dialog_text": "Möchten Sie das Programm wirklich beenden?",
     },
-    "en": {
+    "en": {  # English translations
         "title": "LIVE SCAN",
         "scan": "🔍 Scan Coins",
         "exit": "❌ Exit",
@@ -26,6 +27,14 @@ LANGUAGES = {
 
 
 def switch_language(lang, widgets, current_size):
+    """
+    Update the UI widget texts to match the selected language.
+
+    Args:
+        lang (str): Language code ('de' or 'en').
+        widgets (dict): Dictionary of Tkinter widgets to update.
+        current_size (tuple): Current webcam resolution, used to set size button text.
+    """
     strings = LANGUAGES[lang]
     widgets["title"].config(text=strings["title"])
     widgets["scan_button"].config(text=strings["scan"])

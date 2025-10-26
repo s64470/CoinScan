@@ -1,5 +1,6 @@
 ﻿# -*- coding: utf-8 -*-
 # CoinScan.py (main.py)
+
 import tkinter as tk
 from PIL import Image, ImageTk
 from ui_config import UI_FONT, TITLE_FONT, MONO_FONT, BUTTON_STYLE, on_enter, on_leave
@@ -7,16 +8,22 @@ from language import LANGUAGES, switch_language
 from webcam_stream import update_recognition
 from tkinter import messagebox
 
+# Global variables for webcam size and language
 current_size = (320, 240)
 current_lang = "de"
 
 
 def set_current_lang(lang):
+    """Set the current language globally."""
     global current_lang
     current_lang = lang
 
 
 def toggle_size(scan_button, size_button):
+    """
+    Toggle the webcam resolution between two sizes.
+    Updates the button text accordingly.
+    """
     global current_size
     strings = LANGUAGES[current_lang]
     if scan_button["state"] == "disabled":
@@ -30,12 +37,19 @@ def toggle_size(scan_button, size_button):
 
 
 def exit_program(root):
+    """
+    Show a confirmation dialog before exiting the program.
+    Uses the current language for dialog text.
+    """
     strings = LANGUAGES[current_lang]
     if messagebox.askyesno(strings["exit_dialog_title"], strings["exit_dialog_text"]):
         root.destroy()
 
 
 def center_windowframe(root):
+    """
+    Center the main window on the screen.
+    """
     root.update_idletasks()
     width = root.winfo_width()
     height = root.winfo_height()
@@ -45,11 +59,17 @@ def center_windowframe(root):
 
 
 def main():
+    """
+    Main function to set up and run the GUI application.
+    """
     global current_lang, current_size
+
+    # Initialize the main window
     root = tk.Tk()
     root.title("MünzScan")
     root.geometry("500x500")
 
+    # Sidebar with icon buttons (home, settings, down arrow)
     sidebar = tk.Frame(root, bg="#2c3e50", width=60)
     sidebar.pack(side="left", fill="y")
     for icon in ["🏠", "⚙️", "⬇️"]:
@@ -60,20 +80,22 @@ def main():
         btn.bind("<Enter>", on_enter)
         btn.bind("<Leave>", on_leave)
 
+    # Main content area
     content = tk.Frame(root, bg="white")
     content.pack(side="right", expand=True, fill="both")
 
+    # Language selection frame with flag icons
     lang_frame = tk.Frame(content, bg="white")
     lang_frame.pack(pady=5)
-
-    # Load flag icons
+    # Load flag icons for language buttons
     flag_images = {
         "de": ImageTk.PhotoImage(Image.open("flagicon/flag_DE.png").resize((24, 24))),
         "en": ImageTk.PhotoImage(Image.open("flagicon/flag_UK.png").resize((24, 24))),
     }
 
-    widgets = {}
+    widgets = {}  # Dictionary to hold references to important widgets
 
+    # Create language selection buttons
     for code in ["de", "en"]:
         lang_btn = tk.Button(
             lang_frame,
@@ -89,17 +111,17 @@ def main():
         lang_btn.bind("<Enter>", on_enter)
         lang_btn.bind("<Leave>", on_leave)
 
+    # Title label
     widgets["title"] = tk.Label(
         content, text=LANGUAGES[current_lang]["title"], font=TITLE_FONT, bg="white"
     )
     widgets["title"].pack(pady=10)
 
+    # Webcam display row (webcam image + size toggle button)
     webcam_row = tk.Frame(content, bg="white")
     webcam_row.pack(pady=5)
-
     widgets["webcam_label"] = tk.Label(webcam_row, bg="black")
     widgets["webcam_label"].pack(side="left", padx=5)
-
     widgets["size_button"] = tk.Button(
         webcam_row,
         text=LANGUAGES[current_lang]["size_plus"],
@@ -110,17 +132,21 @@ def main():
     widgets["size_button"].bind("<Enter>", on_enter)
     widgets["size_button"].bind("<Leave>", on_leave)
 
+    # Listbox for recognition results
     widgets["recognition"] = tk.Listbox(content, font=MONO_FONT, height=5)
     widgets["recognition"].pack(pady=5)
 
+    # Label for total value
     widgets["total_label"] = tk.Label(
         content, text=LANGUAGES[current_lang]["total"], font=UI_FONT, bg="white"
     )
     widgets["total_label"].pack(pady=10)
 
+    # Frame for scan and exit buttons
     button_frame = tk.Frame(content, bg="white")
     button_frame.pack(pady=10)
 
+    # Scan button: triggers webcam recognition
     widgets["scan_button"] = tk.Button(
         button_frame,
         text=LANGUAGES[current_lang]["scan"],
@@ -138,6 +164,7 @@ def main():
     widgets["scan_button"].bind("<Enter>", on_enter)
     widgets["scan_button"].bind("<Leave>", on_leave)
 
+    # Exit button: closes the application with confirmation
     widgets["exit_button"] = tk.Button(
         button_frame,
         text=LANGUAGES[current_lang]["exit"],
@@ -148,9 +175,13 @@ def main():
     widgets["exit_button"].bind("<Enter>", on_enter)
     widgets["exit_button"].bind("<Leave>", on_leave)
 
+    # Center the window on the screen
     center_windowframe(root)
+
+    # Start the Tkinter main event loop
     root.mainloop()
 
 
+# Run the main function if this script is executed directly
 if __name__ == "__main__":
     main()
