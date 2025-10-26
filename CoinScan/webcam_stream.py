@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
+# Webcam streaming and coin recognition simulation module.
+# webcam_stream.py
 import cv2
 import threading
 from PIL import Image, ImageTk
+
 
 def update_recognition(
     scan_button, recognition, total_label, webcam_label, current_size, current_lang

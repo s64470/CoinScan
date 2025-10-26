@@ -1,6 +1,7 @@
 ﻿# -*- coding: utf-8 -*-
 # This file manages all language-dependent UI strings and provides a function
 # to update the application's UI elements when the language is changed.
+# language.py
 
 # LANGUAGES dictionary holds all UI text for both German ("de") and English ("en").
 LANGUAGES = {
@@ -48,6 +49,7 @@ LANGUAGES = {
     },
 }
 
+
 def switch_language(lang, widgets, current_size):
     """
     Update all UI elements to the selected language.
@@ -57,7 +59,9 @@ def switch_language(lang, widgets, current_size):
         widgets (dict): Dictionary containing references to all UI widgets.
         current_size (tuple): Current webcam resolution.
     """
-    strings = LANGUAGES.get(lang, LANGUAGES["en"])  # Fallback to English if lang not found
+    strings = LANGUAGES.get(
+        lang, LANGUAGES["en"]
+    )  # Fallback to English if lang not found
 
     # Update main title label
     if "title" in widgets:
@@ -74,7 +78,11 @@ def switch_language(lang, widgets, current_size):
     # Update webcam size button text depending on current resolution
     if "size_button" in widgets:
         widgets["size_button"].config(
-            text=strings["size_plus"] if current_size == (320, 240) else strings["size_minus"]
+            text=(
+                strings["size_plus"]
+                if current_size == (320, 240)
+                else strings["size_minus"]
+            )
         )
 
     # Update File menu entry (Exit)
@@ -91,7 +99,12 @@ def switch_language(lang, widgets, current_size):
         help_menu = widgets["help_menu"]
         idx = widgets.get("help_menu_index", 0)
         try:
-            help_menu.entryconfig(idx, label=strings["help"], image=widgets.get("help_icon"), compound="left")
+            help_menu.entryconfig(
+                idx,
+                label=strings["help"],
+                image=widgets.get("help_icon"),
+                compound="left",
+            )
         except Exception as e:
             print("Help menu entry update failed:", e)
 

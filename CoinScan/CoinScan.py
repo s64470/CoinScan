@@ -1,4 +1,7 @@
-﻿import tkinter as tk
+﻿# -*- coding: utf-8 -*-
+# Main application file for the CoinScan GUI.
+# CoinScan.py
+import tkinter as tk
 from PIL import Image, ImageTk
 from ui_config import UI_FONT, TITLE_FONT, MONO_FONT, BUTTON_STYLE, on_enter, on_leave
 from language import LANGUAGES, switch_language
@@ -9,12 +12,14 @@ from tkinter import messagebox
 current_size = (320, 240)
 current_lang = "de"
 
+
 def set_current_lang(lang):
     """
     Set the global language variable.
     """
     global current_lang
     current_lang = lang
+
 
 def toggle_size(scan_button, size_button):
     """
@@ -32,6 +37,7 @@ def toggle_size(scan_button, size_button):
         current_size = (320, 240)
         size_button.config(text=strings["size_plus"])
 
+
 def exit_program(root):
     """
     Show a confirmation dialog and exit the program if confirmed.
@@ -40,12 +46,14 @@ def exit_program(root):
     if messagebox.askyesno(strings["exit_dialog_title"], strings["exit_dialog_text"]):
         root.destroy()
 
+
 def show_help():
     """
     Show the help dialog in the current language.
     """
     strings = LANGUAGES[current_lang]
     messagebox.showinfo(strings["help_dialog_title"], strings["help_dialog_text"])
+
 
 def center_windowframe(root):
     """
@@ -57,6 +65,7 @@ def center_windowframe(root):
     x = (root.winfo_screenwidth() // 2) - (width // 2)
     y = (root.winfo_screenheight() // 2) - (height // 2)
     root.geometry(f"{width}x{height}+{x}+{y}")
+
 
 def main():
     """
@@ -115,11 +124,9 @@ def main():
         label=LANGUAGES[current_lang]["help"],
         command=show_help,
         image=help_icon,
-        compound="left"
+        compound="left",
     )
-    menu_bar.add_cascade(
-        label=LANGUAGES[current_lang]["help"], menu=help_menu
-    )
+    menu_bar.add_cascade(label=LANGUAGES[current_lang]["help"], menu=help_menu)
     widgets["help_menu"] = help_menu
     widgets["help_menu_index"] = 0
     widgets["help_icon"] = help_icon  # Prevent garbage collection
@@ -195,6 +202,7 @@ def main():
     center_windowframe(root)
     # Start the Tkinter event loop
     root.mainloop()
+
 
 if __name__ == "__main__":
     main()
