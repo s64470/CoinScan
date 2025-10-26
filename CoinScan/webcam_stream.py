@@ -1,6 +1,4 @@
 # -*- coding: utf-8 -*-
-# webcam_stream.py
-
 import cv2
 import threading
 from PIL import Image, ImageTk
@@ -19,7 +17,7 @@ def update_recognition(
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, current_size[0])
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, current_size[1])
 
-        # If webcam is not available, show an error message in the selected language
+        # If webcam is not available, show an error message in the recognition list
         if not cap.isOpened():
             msg = (
                 "Webcam nicht verfügbar."
@@ -30,43 +28,43 @@ def update_recognition(
             scan_button.config(state="normal")
             return
 
-        # Main loop: read frames from the webcam
+        # Main loop: read one frame from the webcam
         while cap.isOpened():
             ret, frame = cap.read()
             if not ret:
                 break
-            # Dummy coin data for demonstration purposes
+
+            # Simulate coin recognition (hardcoded coins for now)
             coins = [("EURO", "1€", "€"), ("EURO", "5 ct", "5")]
             # Clear previous recognition results
             recognition.delete(0, "end")
-            # Insert dummy coin data into the recognition listbox
+            # Insert recognized coins into the listbox
             for currency, value, symbol in coins:
                 recognition.insert("end", f"{currency} {value} {symbol}")
 
-            # Calculate total value (hardcoded for demo)
+            # Calculate and display the total value (hardcoded)
             total = 1.00 + 0.05
             total_text = (
                 f"GESAMT: {total:.2f} €"
                 if current_lang == "de"
                 else f"TOTAL: €{total:.2f}"
             )
-            # Update the total label with the calculated value
             total_label.config(text=total_text)
 
-            # Convert the frame from BGR (OpenCV) to RGB (PIL)
+            # Convert the frame to RGB and resize for display
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            # Convert the frame to a PIL image and resize it
             img = Image.fromarray(frame_rgb).resize(current_size)
-            # Convert the PIL image to a Tkinter-compatible image
             imgtk = ImageTk.PhotoImage(image=img)
-            # Display the image in the webcam_label widget
+            # Display the webcam image in the GUI
             webcam_label.imgtk = imgtk
             webcam_label.configure(image=imgtk)
 
-        # Release the webcam when done
+            # Only process one frame per scan (remove 'break' for continuous streaming)
+            break
+
+        # Release the webcam and re-enable the scan button
         cap.release()
-        # Re-enable the scan button
         scan_button.config(state="normal")
 
-    # Start the stream function in a separate thread to avoid blocking the GUI
+    # Run the stream function in a separate thread to avoid blocking the GUI
     threading.Thread(target=stream, daemon=True).start()
