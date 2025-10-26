@@ -9,6 +9,8 @@ LANGUAGES = {
         "total": "GESAMT: 0,00 €",
         "size_plus": "🔎 +",
         "size_minus": "🔎 -",
+        "exit_dialog_title": "Beenden",
+        "exit_dialog_text": "Möchten Sie das Programm wirklich beenden?",
     },
     "en": {
         "title": "LIVE SCAN",
@@ -17,6 +19,8 @@ LANGUAGES = {
         "total": "TOTAL: €0.00",
         "size_plus": "🔎 +",
         "size_minus": "🔎 -",
+        "exit_dialog_title": "Exit",
+        "exit_dialog_text": "Are you sure you want to exit?",
     },
 }
 
