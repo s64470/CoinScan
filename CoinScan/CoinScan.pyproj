@@ -27,6 +27,7 @@
     <Compile Include="webcam_stream.py" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="flagicon\help_icon.png" />
     <Content Include="flagicon\flag_DE.png" />
     <Content Include="flagicon\flag_UK.png" />
     <Content Include="folderstructure" />

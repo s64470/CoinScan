@@ -3,21 +3,32 @@ import cv2
 import threading
 from PIL import Image, ImageTk
 
-
 def update_recognition(
     scan_button, recognition, total_label, webcam_label, current_size, current_lang
 ):
+    """
+    Handles webcam capture and (simulated) coin recognition.
+    Updates the GUI with recognized coins and webcam image.
+
+    Args:
+        scan_button: The button widget used to start scanning (will be disabled during scan).
+        recognition: The Listbox widget to display recognized coins.
+        total_label: The Label widget to display the total value.
+        webcam_label: The Label widget to display the webcam image.
+        current_size: Tuple for webcam resolution (width, height).
+        current_lang: Current language code ("de" or "en").
+    """
     # Disable the scan button to prevent multiple scans at once
     scan_button.config(state="disabled")
 
     def stream():
-        # Open the default webcam (device 0)
+        # Open the webcam (device 0)
         cap = cv2.VideoCapture(0)
-        # Set the webcam resolution based on current_size
+        # Set webcam resolution
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, current_size[0])
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, current_size[1])
 
-        # If webcam is not available, show an error message in the recognition list
+        # If webcam is not available, show an error message in the selected language
         if not cap.isOpened():
             msg = (
                 "Webcam nicht verfügbar."
@@ -28,21 +39,19 @@ def update_recognition(
             scan_button.config(state="normal")
             return
 
-        # Main loop: read one frame from the webcam
+        # Main loop: read one frame and simulate coin recognition
         while cap.isOpened():
             ret, frame = cap.read()
             if not ret:
                 break
 
-            # Simulate coin recognition (hardcoded coins for now)
+            # Simulate coin recognition (hardcoded coins)
             coins = [("EURO", "1€", "€"), ("EURO", "5 ct", "5")]
-            # Clear previous recognition results
-            recognition.delete(0, "end")
-            # Insert recognized coins into the listbox
+            recognition.delete(0, "end")  # Clear previous results
             for currency, value, symbol in coins:
                 recognition.insert("end", f"{currency} {value} {symbol}")
 
-            # Calculate and display the total value (hardcoded)
+            # Calculate total (hardcoded as 1.05)
             total = 1.00 + 0.05
             total_text = (
                 f"GESAMT: {total:.2f} €"
@@ -55,16 +64,15 @@ def update_recognition(
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             img = Image.fromarray(frame_rgb).resize(current_size)
             imgtk = ImageTk.PhotoImage(image=img)
-            # Display the webcam image in the GUI
-            webcam_label.imgtk = imgtk
+            webcam_label.imgtk = imgtk  # Prevent garbage collection
             webcam_label.configure(image=imgtk)
 
-            # Only process one frame per scan (remove 'break' for continuous streaming)
-            break
+            break  # Only process one frame for this simulation
 
-        # Release the webcam and re-enable the scan button
+        # Release the webcam
         cap.release()
+        # Re-enable the scan button
         scan_button.config(state="normal")
 
-    # Run the stream function in a separate thread to avoid blocking the GUI
+    # Start the webcam stream in a separate thread to keep the UI responsive
     threading.Thread(target=stream, daemon=True).start()

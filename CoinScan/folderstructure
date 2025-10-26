@@ -6,5 +6,6 @@
 ├── flagicon/					# Folder for flag icons
 │   ├── flag_DE.png				# German flag icon (24x24 or 32x32)
 │   └── flag_UK.png				# UK flag icon (24x24 or 32x32)
+│   └── help_icon.png			# Help icon (24x24 or 32x32)
 ├── README.md					# Optional: project overview and setup instructions
 ├── requirements.txt			# Optional: list of dependencies (e.g. opencv-python, Pillow)
