@@ -4,14 +4,7 @@
 import tkinter as tk
 import tkinter.font as tkFont
 from PIL import Image, ImageTk
-from ui_config import (
-    UI_FONT_PARAMS,
-    TITLE_FONT_PARAMS,
-    MONO_FONT_PARAMS,
-    BUTTON_STYLE_PARAMS,
-    on_enter,
-    on_leave,
-)
+from ui_config import UI_FONT_PARAMS, TITLE_FONT_PARAMS, MONO_FONT_PARAMS, BUTTON_STYLE_PARAMS, on_enter, on_leave
 from language import LANGUAGES, switch_language
 from webcam_stream import update_recognition
 from tkinter import messagebox
@@ -21,7 +14,6 @@ current_size = (320, 240)
 current_lang = "de"
 high_contrast = False
 
-
 def change_font_size(delta):
     """Change the font size for all fonts."""
     min_size, max_size = 8, 32
@@ -29,12 +21,10 @@ def change_font_size(delta):
         new_size = max(min_size, min(max_size, font.cget("size") + delta))
         font.configure(size=new_size)
 
-
 def set_current_lang(lang):
     """Set the global language variable."""
     global current_lang
     current_lang = lang
-
 
 def toggle_size(scan_button, size_button):
     """Toggle webcam resolution and update the size button text."""
@@ -49,25 +39,21 @@ def toggle_size(scan_button, size_button):
         current_size = (320, 240)
         size_button.config(text=strings["size_plus"])
 
-
 def exit_program(root):
     """Show a confirmation dialog and exit if confirmed."""
     strings = LANGUAGES[current_lang]
     if messagebox.askyesno(strings["exit_dialog_title"], strings["exit_dialog_text"]):
         root.destroy()
 
-
 def show_help():
     """Show the help dialog in the current language."""
     strings = LANGUAGES[current_lang]
     messagebox.showinfo(strings["help_dialog_title"], strings["help_dialog_text"])
 
-
 def show_about():
     """Show the About dialog in the current language."""
     strings = LANGUAGES[current_lang]
     messagebox.showinfo(strings["about_title"], strings["about_text"])
-
 
 def center_windowframe(root):
     """Center the main window on the screen."""
@@ -77,7 +63,6 @@ def center_windowframe(root):
     x = (root.winfo_screenwidth() // 2) - (width // 2)
     y = (root.winfo_screenheight() // 2) - (height // 2)
     root.geometry(f"{width}x{height}+{x}+{y}")
-
 
 def toggle_contrast():
     """Toggle between default and high-contrast (accessible) themes."""
@@ -112,16 +97,15 @@ def toggle_contrast():
     except Exception:
         pass
 
-
 def main():
     """Build and run the GUI."""
-    global current_lang, current_size, sidebar, content, widgets, menu_bar, contrast_button
+    global current_lang, current_size, sidebar, content, widgets, menu_bar, contrast_button, UI_FONT, TITLE_FONT, MONO_FONT, BUTTON_STYLE
+
     root = tk.Tk()
     root.title("CoinScan")
     root.geometry("500x500")
 
     # Create Font objects after root exists
-    global UI_FONT, TITLE_FONT, MONO_FONT, BUTTON_STYLE
     UI_FONT = tkFont.Font(root=root, **UI_FONT_PARAMS)
     TITLE_FONT = tkFont.Font(root=root, **TITLE_FONT_PARAMS)
     MONO_FONT = tkFont.Font(root=root, **MONO_FONT_PARAMS)
@@ -185,7 +169,7 @@ def main():
     }
     widgets = {}
 
-    # Menu bar setup
+    # --- Menu bar setup ---
     menu_bar = tk.Menu(root)
     root.config(menu=menu_bar)
     file_menu = tk.Menu(menu_bar, tearoff=0)
@@ -218,17 +202,23 @@ def main():
     widgets["help_menu_index"] = 0
     widgets["help_icon"] = help_icon
 
-    # Settings menu
+    # --- Settings menu ---
     settings_menu = tk.Menu(menu_bar, tearoff=0)
-    settings_menu.add_command(label="High Contrast Mode", command=toggle_contrast)
+    settings_menu.add_command(
+        label="High Contrast Mode",
+        command=toggle_contrast
+    )
     settings_menu.add_separator()
     settings_menu.add_command(
-        label="Increase Font Size (A+)", command=lambda: change_font_size(1)
+        label="Increase Font Size (A+)",
+        command=lambda: change_font_size(1)
     )
     settings_menu.add_command(
-        label="Decrease Font Size (A-)", command=lambda: change_font_size(-1)
+        label="Decrease Font Size (A-)",
+        command=lambda: change_font_size(-1)
     )
-    menu_bar.add_cascade(label="Settings", menu=settings_menu)
+    menu_bar.add_cascade(label=LANGUAGES[current_lang]["settings"], menu=settings_menu)
+    widgets["settings_menu"] = settings_menu  # Store for language switching
 
     # Language flag buttons for switching UI language
     for code in ["de", "en"]:
@@ -302,7 +292,6 @@ def main():
 
     # Start the Tkinter event loop
     root.mainloop()
-
 
 if __name__ == "__main__":
     main()

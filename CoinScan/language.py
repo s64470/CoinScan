@@ -12,6 +12,7 @@ LANGUAGES = {
         "exit_dialog_title": "Beenden",
         "exit_dialog_text": "Möchten Sie das Programm wirklich beenden?",
         "file": "Datei",
+        "settings": "Einstellungen",
         "help": "Hilfe",
         "help_dialog_title": "Hilfe",
         "help_dialog_text": (
@@ -42,6 +43,7 @@ LANGUAGES = {
         "exit_dialog_title": "Exit",
         "exit_dialog_text": "Are you sure you want to exit?",
         "file": "File",
+        "settings": "Settings",
         "help": "Help",
         "help_dialog_title": "Help",
         "help_dialog_text": (
@@ -64,9 +66,11 @@ LANGUAGES = {
     },
 }
 
-
 def switch_language(lang, widgets, current_size):
-    """Update all UI elements to the selected language."""
+    """
+    Update all UI elements to the selected language.
+    Ensures the Settings menu is always present after switching languages.
+    """
     strings = LANGUAGES.get(lang, LANGUAGES["en"])
     if "title" in widgets:
         widgets["title"].config(text=strings["title"])
@@ -76,11 +80,7 @@ def switch_language(lang, widgets, current_size):
         widgets["total_label"].config(text=strings["total"])
     if "size_button" in widgets:
         widgets["size_button"].config(
-            text=(
-                strings["size_plus"]
-                if current_size == (320, 240)
-                else strings["size_minus"]
-            )
+            text=(strings["size_plus"] if current_size == (320, 240) else strings["size_minus"])
         )
     if "file_menu" in widgets:
         menu = widgets["file_menu"]
@@ -103,12 +103,15 @@ def switch_language(lang, widgets, current_size):
             print("Help menu entry update failed:", e)
     if "menu_bar" in widgets:
         menu_bar = widgets["menu_bar"]
+        # Clear all existing menu entries to avoid duplicates
         try:
             menu_bar.delete(0, "end")
         except Exception as e:
             print("Menu bar clear failed:", e)
+        # Re-add File, Settings, and Help menus
         try:
             menu_bar.add_cascade(label=strings["file"], menu=widgets["file_menu"])
+            menu_bar.add_cascade(label=strings["settings"], menu=widgets["settings_menu"])
             menu_bar.add_cascade(label=strings["help"], menu=widgets["help_menu"])
         except Exception as e:
             print("Menu bar add_cascade failed:", e)
