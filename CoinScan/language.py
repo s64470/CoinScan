@@ -25,6 +25,15 @@ LANGUAGES = {
             "- Das Programm erkennt Münzen und zeigt die Summe an.\n\n"
             "Bei Problemen wenden Sie sich bitte an den Entwickler."
         ),  # Help dialog message
+        "about_title": "Über CoinScan",
+        "about_text": (
+            "CoinScan\n"
+            "Version: 1.0\n"
+            "Autor: Daniel Riel\n\n"
+            "Eine einfache GUI zur Münzerkennung mit Ihrer Webcam.\n"
+            "Unterstützt die Sprachen Englisch und Deutsch.\n"
+            "Für Support kontaktieren Sie: Daniel.Riel@prosegur.com"
+        ),
     },
     "en": {
         "title": "LIVE SCAN",  # Main window title
@@ -46,6 +55,15 @@ LANGUAGES = {
             "- The program recognizes coins and shows the total.\n\n"
             "For issues, please contact the developer."
         ),  # Help dialog message
+        "about_title": "About CoinScan",
+        "about_text": (
+            "CoinScan\n"
+            "Version: 1.0\n"
+            "Author: Daniel Riel\n\n"
+            "A simple GUI for coin recognition using your webcam.\n"
+            "Supports English and German languages.\n"
+            "For support, contact: Daniel.Riel@prosegur.com"
+        ),
     },
 }
 
@@ -53,7 +71,6 @@ LANGUAGES = {
 def switch_language(lang, widgets, current_size):
     """
     Update all UI elements to the selected language.
-
     Args:
         lang (str): Language code ("de" or "en").
         widgets (dict): Dictionary containing references to all UI widgets.
@@ -62,19 +79,15 @@ def switch_language(lang, widgets, current_size):
     strings = LANGUAGES.get(
         lang, LANGUAGES["en"]
     )  # Fallback to English if lang not found
-
     # Update main title label
     if "title" in widgets:
         widgets["title"].config(text=strings["title"])
-
     # Update scan button text
     if "scan_button" in widgets:
         widgets["scan_button"].config(text=strings["scan"])
-
     # Update total label text
     if "total_label" in widgets:
         widgets["total_label"].config(text=strings["total"])
-
     # Update webcam size button text depending on current resolution
     if "size_button" in widgets:
         widgets["size_button"].config(
@@ -84,7 +97,6 @@ def switch_language(lang, widgets, current_size):
                 else strings["size_minus"]
             )
         )
-
     # Update File menu entry (Exit)
     if "file_menu" in widgets:
         menu = widgets["file_menu"]
@@ -93,7 +105,6 @@ def switch_language(lang, widgets, current_size):
             menu.entryconfig(idx, label=strings["exit"])
         except Exception as e:
             print("Menu entry update failed:", e)
-
     # Update Help menu entry
     if "help_menu" in widgets:
         help_menu = widgets["help_menu"]
@@ -107,17 +118,14 @@ def switch_language(lang, widgets, current_size):
             )
         except Exception as e:
             print("Help menu entry update failed:", e)
-
     # Update menu bar labels ("File" and "Help") safely
     if "menu_bar" in widgets:
         menu_bar = widgets["menu_bar"]
-
         # Clear all existing menu entries to avoid duplicates
         try:
             menu_bar.delete(0, "end")
         except Exception as e:
             print("Menu bar clear failed:", e)
-
         # Re-add cascades with updated labels
         try:
             menu_bar.add_cascade(label=strings["file"], menu=widgets["file_menu"])

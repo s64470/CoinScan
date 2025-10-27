@@ -1,6 +1,7 @@
 ﻿# -*- coding: utf-8 -*-
-# Main application file for the CoinScan GUI.
 # CoinScan.py
+# Main application file for the CoinScan GUI.
+
 import tkinter as tk
 from PIL import Image, ImageTk
 from ui_config import UI_FONT, TITLE_FONT, MONO_FONT, BUTTON_STYLE, on_enter, on_leave
@@ -53,6 +54,14 @@ def show_help():
     """
     strings = LANGUAGES[current_lang]
     messagebox.showinfo(strings["help_dialog_title"], strings["help_dialog_text"])
+
+
+def show_about():
+    """
+    Show the About dialog in the current language.
+    """
+    strings = LANGUAGES[current_lang]
+    messagebox.showinfo(strings["about_title"], strings["about_text"])
 
 
 def center_windowframe(root):
@@ -116,7 +125,7 @@ def main():
     widgets["file_menu"] = file_menu
     widgets["file_menu_exit_index"] = 0
 
-    # Help menu with icon and Help command
+    # Help menu with icon, Help command, and About command
     help_icon_img = Image.open("flagicon/help_icon.png").resize((16, 16))
     help_icon = ImageTk.PhotoImage(help_icon_img)
     help_menu = tk.Menu(menu_bar, tearoff=0)
@@ -125,6 +134,11 @@ def main():
         command=show_help,
         image=help_icon,
         compound="left",
+    )
+    help_menu.add_separator()
+    help_menu.add_command(
+        label=LANGUAGES[current_lang]["about_title"],
+        command=show_about,
     )
     menu_bar.add_cascade(label=LANGUAGES[current_lang]["help"], menu=help_menu)
     widgets["help_menu"] = help_menu
@@ -200,6 +214,7 @@ def main():
 
     # Center the window on the screen
     center_windowframe(root)
+
     # Start the Tkinter event loop
     root.mainloop()
 
