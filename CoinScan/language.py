@@ -66,6 +66,7 @@ LANGUAGES = {
     },
 }
 
+
 def switch_language(lang, widgets, current_size):
     """
     Update all UI elements to the selected language.
@@ -80,7 +81,11 @@ def switch_language(lang, widgets, current_size):
         widgets["total_label"].config(text=strings["total"])
     if "size_button" in widgets:
         widgets["size_button"].config(
-            text=(strings["size_plus"] if current_size == (320, 240) else strings["size_minus"])
+            text=(
+                strings["size_plus"]
+                if current_size == (320, 240)
+                else strings["size_minus"]
+            )
         )
     if "file_menu" in widgets:
         menu = widgets["file_menu"]
@@ -111,7 +116,9 @@ def switch_language(lang, widgets, current_size):
         # Re-add File, Settings, and Help menus
         try:
             menu_bar.add_cascade(label=strings["file"], menu=widgets["file_menu"])
-            menu_bar.add_cascade(label=strings["settings"], menu=widgets["settings_menu"])
+            menu_bar.add_cascade(
+                label=strings["settings"], menu=widgets["settings_menu"]
+            )
             menu_bar.add_cascade(label=strings["help"], menu=widgets["help_menu"])
         except Exception as e:
             print("Menu bar add_cascade failed:", e)
