@@ -1,36 +1,30 @@
 # -*- coding: utf-8 -*-
-# This file defines the UI style and button hover behavior for the application.
-# ui_config.py
+# UI configuration: font parameters, button style parameters, and hover effects
 
-# Font settings for different UI elements
-UI_FONT = ("Verdana", 11)  # Standard font for most UI elements
-TITLE_FONT = ("Verdana", 14, "bold")  # Font for main titles
-MONO_FONT = ("Consolas", 10)  # Monospaced font for lists or code-like displays
+# Font parameters (not Font objects!)
+UI_FONT_PARAMS = {"family": "Verdana", "size": 11}
+TITLE_FONT_PARAMS = {"family": "Verdana", "size": 14, "weight": "bold"}
+MONO_FONT_PARAMS = {"family": "Consolas", "size": 10}
 
-# Button style settings (used for all main buttons)
-BUTTON_STYLE = {
-    "font": UI_FONT,  # Button font
-    "bg": "#3498db",  # Button background color (blue)
-    "fg": "white",  # Button text color
-    "activebackground": "#2980b9",  # Background color when button is pressed or hovered
-    "activeforeground": "white",  # Text color when button is pressed or hovered
-    "relief": "raised",  # Button border style
-    "bd": 2,  # Border width
-    "padx": 10,  # Horizontal padding inside button
-    "pady": 5,  # Vertical padding inside button
+# Button style parameters (no font yet)
+BUTTON_STYLE_PARAMS = {
+    "bg": "#3498db",
+    "fg": "white",
+    "activebackground": "#2980b9",
+    "activeforeground": "white",
+    "relief": "raised",
+    "bd": 2,
+    "padx": 10,
+    "pady": 5,
 }
 
 
+# Button hover effects (to be used in main file)
 def on_enter(e):
-    """
-    Change button background color when the mouse pointer enters the button.
-    This provides a visual hover effect.
-    """
-    e.widget["background"] = "#2980b9"
+    """Change button background color on hover."""
+    e.widget["background"] = BUTTON_STYLE_PARAMS["activebackground"]
 
 
 def on_leave(e):
-    """
-    Reset button background color when the mouse pointer leaves the button.
-    """
-    e.widget["background"] = "#3498db"
+    """Reset button background color when not hovered."""
+    e.widget["background"] = BUTTON_STYLE_PARAMS["bg"]
