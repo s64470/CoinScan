@@ -4,9 +4,10 @@
 ├── language.py					# Multilingual strings and switch logic
 ├── webcam_stream.py			# Webcam capture and coin recognition
 ├── flagicon/					# Folder for flag icons
-│   ├── flag_DE.png				# German flag icon (24x24 or 32x32)
-│   └── flag_UK.png				# UK flag icon (24x24 or 32x32)
-│   └── help_icon.png			# Help icon (24x24 or 32x32)
+│   ├── flag_DE.png				# German flag icon
+│   └── flag_UK.png				# UK flag icon
+│   └── help_icon.png			# Help icon
+│   └── contrast_icon.png		# Light/Dark mode contrast icon
 ├── README.md					# project overview and setup instructions
 ├── SECURITY.md					# security considerations and best practices
 ├── requirements.txt			# Optional: list of dependencies (e.g. opencv-python, Pillow)

@@ -9,24 +9,18 @@ from language import LANGUAGES, switch_language
 from webcam_stream import update_recognition
 from tkinter import messagebox
 
-# Global variables for webcam resolution and language
+# --- Global state for webcam and language ---
 current_size = (320, 240)
 current_lang = "de"
-
+high_contrast = False  # Track if high-contrast mode is active
 
 def set_current_lang(lang):
-    """
-    Set the global language variable.
-    """
+    """Set the global language variable."""
     global current_lang
     current_lang = lang
 
-
 def toggle_size(scan_button, size_button):
-    """
-    Toggle the webcam resolution between two presets.
-    Updates the size button text accordingly.
-    """
+    """Toggle webcam resolution and update the size button text."""
     global current_size
     strings = LANGUAGES[current_lang]
     if scan_button["state"] == "disabled":
@@ -38,36 +32,24 @@ def toggle_size(scan_button, size_button):
         current_size = (320, 240)
         size_button.config(text=strings["size_plus"])
 
-
 def exit_program(root):
-    """
-    Show a confirmation dialog and exit the program if confirmed.
-    """
+    """Show a confirmation dialog and exit if confirmed."""
     strings = LANGUAGES[current_lang]
     if messagebox.askyesno(strings["exit_dialog_title"], strings["exit_dialog_text"]):
         root.destroy()
 
-
 def show_help():
-    """
-    Show the help dialog in the current language.
-    """
+    """Show the help dialog in the current language."""
     strings = LANGUAGES[current_lang]
     messagebox.showinfo(strings["help_dialog_title"], strings["help_dialog_text"])
 
-
 def show_about():
-    """
-    Show the About dialog in the current language.
-    """
+    """Show the About dialog in the current language."""
     strings = LANGUAGES[current_lang]
     messagebox.showinfo(strings["about_title"], strings["about_text"])
 
-
 def center_windowframe(root):
-    """
-    Center the main window on the screen.
-    """
+    """Center the main window on the screen."""
     root.update_idletasks()
     width = root.winfo_width()
     height = root.winfo_height()
@@ -75,19 +57,66 @@ def center_windowframe(root):
     y = (root.winfo_screenheight() // 2) - (height // 2)
     root.geometry(f"{width}x{height}+{x}+{y}")
 
+def toggle_contrast():
+    """
+    Toggle between default and high-contrast (barrierefrei) themes.
+    Updates colors of all main widgets live.
+    """
+    global high_contrast
+    high_contrast = not high_contrast
+
+    # Define colors for both themes
+    if high_contrast:
+        bg_color = "black"
+        fg_color = "yellow"
+        btn_bg = "#333"
+        btn_fg = "white"
+        entry_bg = "black"
+        entry_fg = "yellow"
+    else:
+        bg_color = "white"
+        fg_color = "black"
+        btn_bg = BUTTON_STYLE["bg"]
+        btn_fg = BUTTON_STYLE["fg"]
+        entry_bg = "white"
+        entry_fg = "black"
+
+    # Update sidebar and its buttons
+    sidebar.config(bg=bg_color)
+    for widget in sidebar.winfo_children():
+        widget.config(bg=btn_bg, fg=btn_fg)
+
+    # Update main content area
+    content.config(bg=bg_color)
+
+    # Update all main widgets
+    widgets["title"].config(bg=bg_color, fg=fg_color)
+    widgets["total_label"].config(bg=bg_color, fg=fg_color)
+    widgets["recognition"].config(bg=entry_bg, fg=entry_fg)
+    widgets["scan_button"].config(bg=btn_bg, fg=btn_fg)
+    widgets["size_button"].config(bg=btn_bg, fg=btn_fg)
+    contrast_button.config(bg=btn_bg, fg=btn_fg)
+
+    # Try to update menu bar colors (may not work on all platforms)
+    try:
+        menu_bar.config(bg=bg_color, fg=fg_color)
+    except Exception:
+        pass
 
 def main():
-    """
-    Main function to build and run the GUI.
-    """
-    global current_lang, current_size
+    """Main function to build and run the GUI."""
+    global current_lang, current_size, sidebar, content, widgets, menu_bar, contrast_button
+
+    # --- Main window setup ---
     root = tk.Tk()
     root.title("MünzScan")
     root.geometry("500x500")
 
-    # Sidebar with icon buttons (for navigation/settings, can be extended)
+    # --- Sidebar setup ---
     sidebar = tk.Frame(root, bg="#2c3e50", width=60)
     sidebar.pack(side="left", fill="y")
+
+    # Sidebar icon buttons (navigation/settings)
     for icon in ["🏠", "⚙️", "⬇️"]:
         btn = tk.Button(
             sidebar, text=icon, bg="#2c3e50", fg="white", relief="flat", font=UI_FONT
@@ -96,11 +125,33 @@ def main():
         btn.bind("<Enter>", on_enter)
         btn.bind("<Leave>", on_leave)
 
-    # Main content area
+    # --- Contrast toggle button with sun/moon icon ---
+    # Make sure you have flagicon/contrast_icon.png (24x24 px)
+    contrast_icon_img = Image.open("flagicon/contrast_icon.png").resize((24, 24))
+    contrast_icon = ImageTk.PhotoImage(contrast_icon_img)
+    contrast_button = tk.Button(
+        sidebar,
+        image=contrast_icon,
+        command=toggle_contrast,
+        bg=BUTTON_STYLE["bg"],
+        fg=BUTTON_STYLE["fg"],
+        activebackground=BUTTON_STYLE["activebackground"],
+        activeforeground=BUTTON_STYLE["activeforeground"],
+        relief=BUTTON_STYLE["relief"],
+        bd=BUTTON_STYLE["bd"],
+        padx=BUTTON_STYLE["padx"],
+        pady=BUTTON_STYLE["pady"],
+    )
+    contrast_button.image = contrast_icon  # Prevent garbage collection
+    contrast_button.pack(pady=10)
+    contrast_button.bind("<Enter>", on_enter)
+    contrast_button.bind("<Leave>", on_leave)
+
+    # --- Main content area ---
     content = tk.Frame(root, bg="white")
     content.pack(side="right", expand=True, fill="both")
 
-    # Language selection buttons (flags)
+    # --- Language selection buttons (flags) ---
     lang_frame = tk.Frame(content, bg="white")
     lang_frame.pack(pady=5)
     flag_images = {
@@ -109,7 +160,7 @@ def main():
     }
     widgets = {}
 
-    # Menu bar setup
+    # --- Menu bar setup ---
     menu_bar = tk.Menu(root)
     root.config(menu=menu_bar)
 
@@ -144,8 +195,7 @@ def main():
     widgets["help_menu"] = help_menu
     widgets["help_menu_index"] = 0
     widgets["help_icon"] = help_icon  # Prevent garbage collection
-
-    # Language flag buttons for switching UI language
+    # --- Language flag buttons for switching UI language ---
     for code in ["de", "en"]:
         lang_btn = tk.Button(
             lang_frame,
@@ -161,13 +211,13 @@ def main():
         lang_btn.bind("<Enter>", on_enter)
         lang_btn.bind("<Leave>", on_leave)
 
-    # Main title label
+    # --- Main title label ---
     widgets["title"] = tk.Label(
         content, text=LANGUAGES[current_lang]["title"], font=TITLE_FONT, bg="white"
     )
     widgets["title"].pack(pady=10)
 
-    # Webcam display row (webcam image + size toggle button)
+    # --- Webcam display row (webcam image + size toggle button) ---
     webcam_row = tk.Frame(content, bg="white")
     webcam_row.pack(pady=5)
     widgets["webcam_label"] = tk.Label(webcam_row, bg="black")
@@ -182,17 +232,17 @@ def main():
     widgets["size_button"].bind("<Enter>", on_enter)
     widgets["size_button"].bind("<Leave>", on_leave)
 
-    # Listbox to display recognized coins
+    # --- Listbox to display recognized coins ---
     widgets["recognition"] = tk.Listbox(content, font=MONO_FONT, height=5)
     widgets["recognition"].pack(pady=5)
 
-    # Label to display the total value of recognized coins
+    # --- Label to display the total value of recognized coins ---
     widgets["total_label"] = tk.Label(
         content, text=LANGUAGES[current_lang]["total"], font=UI_FONT, bg="white"
     )
     widgets["total_label"].pack(pady=10)
 
-    # Scan button to start coin recognition
+    # --- Scan button to start coin recognition ---
     button_frame = tk.Frame(content, bg="white")
     button_frame.pack(pady=10)
     widgets["scan_button"] = tk.Button(
@@ -212,12 +262,11 @@ def main():
     widgets["scan_button"].bind("<Enter>", on_enter)
     widgets["scan_button"].bind("<Leave>", on_leave)
 
-    # Center the window on the screen
+    # --- Center the window on the screen ---
     center_windowframe(root)
 
-    # Start the Tkinter event loop
+    # --- Start the Tkinter event loop ---
     root.mainloop()
-
 
 if __name__ == "__main__":
     main()
