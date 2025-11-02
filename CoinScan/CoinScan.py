@@ -1,13 +1,11 @@
 ﻿import tkinter as tk
 import tkinter.messagebox as messagebox
 from PIL import Image, ImageTk
-
 from webcam_stream import update_recognition
 from language import LANGUAGES
 from ui_config import COLORS, FONTS, ICON_PATHS, SIZES, SIDEBAR_ICONS, CONTRAST_ICONS
 
 VERSION = "1.0.0"
-
 ABOUT_TEXT = (
     "CoinScan is a desktop application designed to help users quickly identify and count Euro coins using their computer’s webcam.\n\n"
     "Key Features:\n"
@@ -60,34 +58,36 @@ class CoinScanApp(tk.Tk):
         )
         self.title_label.pack(side="left", padx=20)
 
-        # Language flags
+        # Top bar right controls (language flags and contrast)
+        topbar_controls = tk.Frame(top_bar, bg=COLORS["topbar_bg"])
+        topbar_controls.pack(side="right", padx=10)
         self.flag_de = get_flag_img(ICON_PATHS["flag_de"])
         self.flag_en = get_flag_img(ICON_PATHS["flag_en"])
         tk.Button(
-            top_bar,
+            topbar_controls,
             image=self.flag_de,
             bd=0,
             bg=COLORS["topbar_bg"],
             command=lambda: self.set_language("de"),
-        ).pack(side="right", padx=5)
+        ).pack(side="left", padx=2)
         tk.Button(
-            top_bar,
+            topbar_controls,
             image=self.flag_en,
             bd=0,
             bg=COLORS["topbar_bg"],
             command=lambda: self.set_language("en"),
-        ).pack(side="right", padx=5)
-
-        # High-contrast toggle
+        ).pack(side="left", padx=2)
+        # Spacer between language and contrast buttons
+        tk.Frame(topbar_controls, width=16, bg=COLORS["topbar_bg"]).pack(side="left")
         self.contrast_btn = tk.Button(
-            top_bar,
+            topbar_controls,
             text=CONTRAST_ICONS["normal"],
             bd=0,
             bg=COLORS["topbar_bg"],
             command=self.toggle_contrast,
             font=FONTS["button"],
         )
-        self.contrast_btn.pack(side="right", padx=5)
+        self.contrast_btn.pack(side="left", padx=8)
 
         # Sidebar
         self.sidebar = tk.Frame(
@@ -142,7 +142,6 @@ class CoinScanApp(tk.Tk):
                 )
             btn.pack(pady=20)
             self.sidebar_buttons.append(btn)
-
         self.sidebar_version_label = tk.Label(
             self.sidebar,
             text=f"v{VERSION}",
@@ -164,7 +163,7 @@ class CoinScanApp(tk.Tk):
         self.webcam_label = tk.Label(self.webcam_panel, bg="black", width=80, height=24)
         self.webcam_label.pack(pady=10)
         self.recognition_list = tk.Listbox(
-            self.webcam_panel, font=FONTS["listbox"], height=5
+            self.webcam_panel, font=FONTS["listbox"], height=5, width=50
         )
         self.recognition_list.pack(pady=10)
         self.scan_btn = tk.Button(
@@ -222,19 +221,23 @@ class CoinScanApp(tk.Tk):
             main_content, bg=COLORS["topbar_bg"], bd=2, relief="ridge"
         )
         self.results_panel.pack(side="right", padx=40, pady=40, fill="y")
+
+        # Results label
         self.results_label = tk.Label(
             self.results_panel, font=FONTS["results"], bg=COLORS["topbar_bg"]
         )
-        self.results_label.pack(pady=(10, 5))
+        self.results_label.pack(pady=(20, 10))
+
+        # Total label
         self.total_label = tk.Label(
             self.results_panel,
             font=FONTS["total"],
             bg=COLORS["topbar_bg"],
             fg=COLORS["results_fg"],
         )
-        self.total_label.pack(pady=(20, 10))
+        self.total_label.pack(pady=(0, 10))
 
-        # Footer
+        # Footer (left-aligned copyright with extra padding)
         self.footer = tk.Frame(
             self, bg=COLORS["topbar_bg"], height=SIZES["footer_height"]
         )
@@ -245,8 +248,10 @@ class CoinScanApp(tk.Tk):
             font=FONTS["footer"],
             bg=COLORS["topbar_bg"],
             fg=COLORS["sidebar_bg"],
+            anchor="w",
+            justify="left",
         )
-        self.footer_label.pack(pady=5)
+        self.footer_label.pack(padx=16, pady=8, side="left")
 
     def set_language(self, lang):
         self.current_lang = lang
@@ -322,6 +327,7 @@ class CoinScanApp(tk.Tk):
         self.results_panel.config(bg=bg_panel)
         self.results_label.config(bg=bg_panel, fg=fg_panel)
         self.total_label.config(bg=bg_panel, fg=fg_panel)
+        # Footer adapts to contrast mode
         self.footer.config(bg=bg_panel)
         self.footer_label.config(bg=bg_panel, fg=sidebar_bg)
 

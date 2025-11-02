@@ -24,6 +24,7 @@ def update_recognition(
         if not cap.isOpened():
             scan_button.config(state="normal")
             return
+
         ret, frame = cap.read()
         if not ret:
             scan_button.config(state="normal")
@@ -39,9 +40,9 @@ def update_recognition(
             dp=1.2,
             minDist=30,
             param1=50,
-            param2=12,
-            minRadius=10,
-            maxRadius=90,
+            param2=16,  # You can increase this to reduce false positives
+            minRadius=15,  # Adjust to match your smallest coin
+            maxRadius=90,  # Adjust to match your largest coin
         )
 
         recognition.delete(0, "end")  # Clear previous recognition results
@@ -54,6 +55,7 @@ def update_recognition(
             frame_centre_y = frame.shape[0] // 2
             tolerance_x = frame.shape[1] * 0.2
             tolerance_y = frame.shape[0] * 0.2
+
             # Filter coins near the centre of the frame
             centre_coins = [
                 (x, y, r)
@@ -61,6 +63,7 @@ def update_recognition(
                 if (abs(x - frame_centre_x) <= tolerance_x)
                 and (abs(y - frame_centre_y) <= tolerance_y)
             ]
+
             if centre_coins:
                 # Use the largest coin in the centre
                 x, y, r = max(centre_coins, key=lambda c: c[2])
@@ -68,12 +71,13 @@ def update_recognition(
                 cv2.circle(mask, (x, y), r, 255, -1)
                 coin_pixels = cv2.bitwise_and(frame, frame, mask=mask)
                 coin_hsv = cv2.cvtColor(coin_pixels, cv2.COLOR_BGR2HSV)
-                # Use float64 to avoid overflow in mean calculation
                 coin_hue = coin_hsv[:, :, 0][mask == 255].astype(np.float64)
                 mean_hue = np.mean(coin_hue) if coin_hue.size > 0 else 0.0
+
                 print(f"Detected coin: radius={r}, mean_hue={mean_hue:.1f}")
 
-                # Classify coin by hue and radius
+                # --- Calibration Section ---
+                # Adjust these thresholds based on your coins and lighting!
                 if 18 < mean_hue < 35:
                     colour_label = "Gold"
                 elif 8 < mean_hue <= 18:
@@ -100,11 +104,13 @@ def update_recognition(
                 else:
                     value = 0.05
                     label = "Unknown"
+
                 total += value
                 recognition.insert(
                     "end",
                     f"Coin: {label} ({colour_label}, radius: {r}, hue: {mean_hue:.1f})",
                 )
+
                 # Draw detected coin on frame
                 cv2.circle(frame, (x, y), r, (0, 255, 0), 2)
                 cv2.circle(frame, (x, y), 2, (0, 0, 255), 3)
@@ -131,6 +137,7 @@ def update_recognition(
         imgtk = ImageTk.PhotoImage(image=img)
         webcam_label.imgtk = imgtk
         webcam_label.configure(image=imgtk)
+
         cap.release()
         scan_button.config(state="normal")
 
