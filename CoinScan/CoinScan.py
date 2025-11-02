@@ -16,7 +16,7 @@ ABOUT_TEXT = (
     "- Simple, intuitive design\n\n"
     "How it works:\n"
     "Place your coins in view of your webcam and click “Scan Coins.” CoinScan will detect coins in the centre of the image, classify them by colour and size, and display the total value.\n\n"
-    "Developed for anyone who wants a fast, easy way to count coins—whether for personal use, small businesses, or educational purposes."
+    # "Developed for anyone who wants a fast, easy way to count coins—whether for personal use, small businesses, or educational purposes."
 )
 
 
@@ -109,7 +109,6 @@ class CoinScanApp(tk.Tk):
         )
         self.sidebar.pack(side="left", fill="y")
         self.sidebar_buttons = []
-
         # Sidebar navigation buttons (except Exit)
         for idx, icon in enumerate(SIDEBAR_ICONS):
             if idx == 3:
@@ -149,18 +148,7 @@ class CoinScanApp(tk.Tk):
                 )
             btn.pack(pady=20)
             self.sidebar_buttons.append(btn)
-
-        # Version label at the bottom
-        self.sidebar_version_label = tk.Label(
-            self.sidebar,
-            text=f"v{VERSION}",
-            font=FONTS["version"],
-            bg=COLORS["sidebar_bg"],
-            fg=COLORS["sidebar_fg"],
-        )
-        self.sidebar_version_label.pack(side="bottom", pady=10)
-
-        # Exit button under version label
+        # Exit button under sidebar
         exit_btn = tk.Button(
             self.sidebar,
             text=SIDEBAR_ICONS[3],  # Exit icon
@@ -203,7 +191,6 @@ class CoinScanApp(tk.Tk):
             command=self.start_recognition,
         )
         self.scan_btn.pack(pady=10)
-
         # Size buttons
         size_frame = tk.Frame(self.webcam_panel, bg=COLORS["panel_bg"])
         size_frame.pack(pady=5)
@@ -244,13 +231,11 @@ class CoinScanApp(tk.Tk):
             main_content, bg=COLORS["topbar_bg"], bd=2, relief="ridge"
         )
         self.results_panel.pack(side="right", padx=40, pady=40, fill="y")
-
         # Results label
         self.results_label = tk.Label(
             self.results_panel, font=FONTS["results"], bg=COLORS["topbar_bg"]
         )
         self.results_label.pack(pady=(20, 10))
-
         # Total label
         self.total_label = tk.Label(
             self.results_panel,
@@ -333,7 +318,7 @@ class CoinScanApp(tk.Tk):
         self.sidebar.config(bg=sidebar_bg)
         for btn in self.sidebar_buttons:
             btn.config(bg=sidebar_bg, fg=sidebar_fg)
-        self.sidebar_version_label.config(bg=sidebar_bg, fg=sidebar_fg)
+        # Removed version label update
         self.webcam_panel.config(bg=bg_panel)
         self.webcam_label.config(bg=entry_bg, fg=entry_fg)
         self.recognition_list.config(bg=entry_bg, fg=entry_fg)

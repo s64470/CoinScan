@@ -15,11 +15,12 @@ COLORS = {
     "button_active_bg": "#2980b9",  # Button background when active
     "button_active_fg": "white",  # Button foreground when active
     "results_fg": "#3498db",  # Results text colour
-    "contrast_bg": "#000000",  # High-contrast background
-    "contrast_fg": "#FFFF00",  # High-contrast foreground
-    "contrast_panel_bg": "#222222",  # High-contrast panel background
-    "contrast_sidebar_bg": "#000000",  # High-contrast sidebar background
-    "contrast_sidebar_fg": "#FFFF00",  # High-contrast sidebar foreground
+    # High-contrast mode (all greys set to black)
+    "contrast_bg": "#000000",  # High-contrast background (BLACK)
+    "contrast_fg": "#FFFF00",  # High-contrast foreground (YELLOW)
+    "contrast_panel_bg": "#000000",  # High-contrast panel background (BLACK)
+    "contrast_sidebar_bg": "#000000",  # High-contrast sidebar background (BLACK)
+    "contrast_sidebar_fg": "#FFFF00",  # High-contrast sidebar foreground (YELLOW)
 }
 
 # Font settings for various UI elements
