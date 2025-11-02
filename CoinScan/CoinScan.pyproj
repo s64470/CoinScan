@@ -27,14 +27,15 @@
     <Compile Include="webcam_stream.py" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="flagicon\contrast_icon.png" />
-    <Content Include="flagicon\help_icon.png" />
-    <Content Include="flagicon\flag_DE.png" />
-    <Content Include="flagicon\flag_UK.png" />
+    <Content Include="icon\contrast_icon.png" />
+    <Content Include="icon\help_icon.png" />
+    <Content Include="icon\flag_DE.png" />
+    <Content Include="icon\flag_UK.png" />
     <Content Include="folderstructure" />
+    <Content Include="icon\logo.png" />
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="flagicon\" />
+    <Folder Include="icon\" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
   <!-- Uncomment the CoreCompile target to enable the Build command in

@@ -19,14 +19,12 @@ ABOUT_TEXT = (
     "Developed for anyone who wants a fast, easy way to count coins—whether for personal use, small businesses, or educational purposes."
 )
 
-
 def get_flag_img(path):
     try:
         img = Image.open(path).resize(SIZES["flag"])
     except Exception:
         img = Image.new("RGB", SIZES["flag"], "grey")
     return ImageTk.PhotoImage(img)
-
 
 class CoinScanApp(tk.Tk):
     def __init__(self):
@@ -53,6 +51,20 @@ class CoinScanApp(tk.Tk):
         # Top bar
         top_bar = tk.Frame(self, bg=COLORS["topbar_bg"], height=48)
         top_bar.pack(side="top", fill="x")
+
+        # Logo (left side, always SIZES["logo_width"] x SIZES["logo_width"], aligned to window border)
+        try:
+            self.logo_img = Image.open("icon/logo.png").resize(
+                (SIZES["logo_width"], SIZES["logo_width"])
+            )
+            self.logo_photo = ImageTk.PhotoImage(self.logo_img)
+        except Exception:
+            self.logo_photo = None
+
+        if self.logo_photo:
+            self.logo_label = tk.Label(top_bar, image=self.logo_photo, bg=COLORS["topbar_bg"])
+            self.logo_label.pack(side="left", padx=(0, 0))  # Flush to window border
+
         self.title_label = tk.Label(
             top_bar, font=FONTS["title"], bg=COLORS["topbar_bg"]
         )
@@ -89,7 +101,7 @@ class CoinScanApp(tk.Tk):
         )
         self.contrast_btn.pack(side="left", padx=8)
 
-        # Sidebar
+        # Sidebar (width always matches logo width)
         self.sidebar = tk.Frame(
             self, bg=COLORS["sidebar_bg"], width=SIZES["sidebar_width"]
         )
@@ -249,7 +261,7 @@ class CoinScanApp(tk.Tk):
             bg=COLORS["topbar_bg"],
             fg=COLORS["sidebar_bg"],
             anchor="w",
-            justify="left",
+            justify="left"
         )
         self.footer_label.pack(padx=16, pady=8, side="left")
 
@@ -304,7 +316,6 @@ class CoinScanApp(tk.Tk):
             sidebar_bg = COLORS["sidebar_bg"]
             sidebar_fg = COLORS["sidebar_fg"]
             contrast_icon = CONTRAST_ICONS["normal"]
-
         self.configure(bg=bg_main)
         self.title_label.config(bg=bg_panel, fg=fg_panel)
         self.contrast_btn.config(bg=bg_panel, fg=fg_panel, text=contrast_icon)
@@ -401,7 +412,6 @@ class CoinScanApp(tk.Tk):
         self.recognition_list.delete(0, "end")
         self.total_label.config(text=LANGUAGES[self.current_lang]["total"])
         self.webcam_label.config(image="")
-
 
 if __name__ == "__main__":
     app = CoinScanApp()
