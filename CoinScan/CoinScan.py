@@ -4,6 +4,7 @@ from PIL import Image, ImageTk
 from webcam_stream import update_recognition
 from language import LANGUAGES
 from ui_config import COLORS, FONTS, ICON_PATHS, SIZES, SIDEBAR_ICONS, CONTRAST_ICONS
+import os
 
 VERSION = "1.0.0"
 ABOUT_TEXT = (
@@ -21,8 +22,12 @@ ABOUT_TEXT = (
 
 
 def get_flag_img(path):
+    # Build an absolute path relative to this script to avoid escape-sequence
+    # problems and ensure the resource is found regardless of current working dir.
+    base = os.path.dirname(__file__)
+    full_path = os.path.join(base, path)
     try:
-        img = Image.open(path).resize(SIZES["flag"])
+        img = Image.open(full_path).resize(SIZES["flag"])
     except Exception:
         img = Image.new("RGB", SIZES["flag"], "grey")
     return ImageTk.PhotoImage(img)
@@ -56,7 +61,8 @@ class CoinScanApp(tk.Tk):
 
         # Logo (left side)
         try:
-            self.logo_img = Image.open("icon/logo.png").resize(
+            logo_path = os.path.join("icon", "logo.png")
+            self.logo_img = Image.open(logo_path).resize(
                 (SIZES["logo_width"], SIZES["logo_width"])
             )
             self.logo_photo = ImageTk.PhotoImage(self.logo_img)
@@ -171,7 +177,9 @@ class CoinScanApp(tk.Tk):
             main_content, bg=COLORS["panel_bg"], bd=2, relief="groove"
         )
         self.webcam_panel.pack(side="left", padx=40, pady=40, fill="both", expand=True)
-        self.webcam_label = tk.Label(self.webcam_panel, bg="black", width=80, height=24)
+        self.webcam_label = tk.Label(
+            self.webcam_panel, bg="black", fg="white", width=80, height=24
+        )
         self.webcam_label.pack(pady=10)
         self.recognition_list = tk.Listbox(
             self.webcam_panel, font=FONTS["listbox"], height=5, width=50
@@ -225,6 +233,39 @@ class CoinScanApp(tk.Tk):
         )
         self.size_btn_large.pack(side="left", padx=5)
         self.set_size(self.current_size)
+
+        # Font size controls (global)
+        font_frame = tk.Frame(self.webcam_panel, bg=COLORS["panel_bg"])
+        font_frame.pack(pady=(0, 10))
+        tk.Label(
+            font_frame, text="Font size:", bg=COLORS["panel_bg"], font=FONTS["button"]
+        ).pack(side="left", padx=(0, 8))
+        tk.Button(
+            font_frame,
+            text="A-",
+            font=FONTS["button"],
+            bg=COLORS["button_bg"],
+            fg=COLORS["button_fg"],
+            activebackground=COLORS["button_active_bg"],
+            activeforeground=COLORS["button_active_fg"],
+            bd=0,
+            padx=8,
+            pady=4,
+            command=lambda: self.adjust_font_size(-1),
+        ).pack(side="left", padx=4)
+        tk.Button(
+            font_frame,
+            text="A+",
+            font=FONTS["button"],
+            bg=COLORS["button_bg"],
+            fg=COLORS["button_fg"],
+            activebackground=COLORS["button_active_bg"],
+            activeforeground=COLORS["button_active_fg"],
+            bd=0,
+            padx=8,
+            pady=4,
+            command=lambda: self.adjust_font_size(1),
+        ).pack(side="left", padx=4)
 
         # Results panel (right)
         self.results_panel = tk.Frame(
@@ -287,6 +328,38 @@ class CoinScanApp(tk.Tk):
         self.high_contrast = not self.high_contrast
         self.apply_contrast()
 
+    def adjust_font_size(self, delta):
+        # Adjust numeric sizes inside FONTS where possible.
+        # FONTS is expected to be a dict of tkinter font descriptions (family, size, ...)
+        from tkinter import font as tkfont
+
+        for key, f in FONTS.items():
+            try:
+                # If it's a tkfont.Font instance, modify it directly
+                if isinstance(f, tkfont.Font):
+                    current = f.cget("size")
+                    f.configure(size=max(6, current + delta))
+                elif isinstance(f, tuple) and len(f) >= 2 and isinstance(f[1], int):
+                    # tuple like (family, size, ...)
+                    new_size = max(6, f[1] + delta)
+                    FONTS[key] = (f[0], new_size) + tuple(f[2:])
+                elif isinstance(f, (list,)) and len(f) >= 2 and isinstance(f[1], int):
+                    new_size = max(6, f[1] + delta)
+                    FONTS[key] = [f[0], new_size] + f[2:]
+            except Exception:
+                continue
+
+        # Apply changes to visible widgets
+        self.title_label.config(font=FONTS["title"])
+        self.scan_btn.config(font=FONTS["button"])
+        self.size_btn_small.config(font=FONTS["size_button"])
+        self.size_btn_large.config(font=FONTS["size_button"])
+        self.recognition_list.config(font=FONTS["listbox"])
+        self.results_label.config(font=FONTS["results"])
+        self.total_label.config(font=FONTS["total"])
+        self.footer_label.config(font=FONTS["footer"])
+        self.contrast_btn.config(font=FONTS["button"])
+
     def apply_contrast(self):
         if self.high_contrast:
             bg_main = COLORS["contrast_bg"]
@@ -318,9 +391,9 @@ class CoinScanApp(tk.Tk):
         self.sidebar.config(bg=sidebar_bg)
         for btn in self.sidebar_buttons:
             btn.config(bg=sidebar_bg, fg=sidebar_fg)
-        # Removed version label update
         self.webcam_panel.config(bg=bg_panel)
-        self.webcam_label.config(bg=entry_bg, fg=entry_fg)
+        # Always keep webcam label background black
+        self.webcam_label.config(bg="black", fg=entry_fg)
         self.recognition_list.config(bg=entry_bg, fg=entry_fg)
         self.scan_btn.config(
             bg=btn_bg, fg=btn_fg, activebackground=btn_bg, activeforeground=btn_fg
@@ -357,7 +430,14 @@ class CoinScanApp(tk.Tk):
             text="About CoinScan",
             font=FONTS["about_title"],
             bg=COLORS["background"],
-        ).pack(padx=20, pady=(20, 10))
+        ).pack(padx=20, pady=(20, 5))
+        tk.Label(
+            about_win,
+            text=f"Version: {VERSION}",
+            font=FONTS["version"],
+            bg=COLORS["background"],
+            fg=COLORS["sidebar_bg"],
+        ).pack(padx=20, pady=(0, 10))
         tk.Message(
             about_win,
             text=ABOUT_TEXT,
