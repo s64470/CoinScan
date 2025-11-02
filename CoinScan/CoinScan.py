@@ -19,12 +19,14 @@ ABOUT_TEXT = (
     "Developed for anyone who wants a fast, easy way to count coins—whether for personal use, small businesses, or educational purposes."
 )
 
+
 def get_flag_img(path):
     try:
         img = Image.open(path).resize(SIZES["flag"])
     except Exception:
         img = Image.new("RGB", SIZES["flag"], "grey")
     return ImageTk.PhotoImage(img)
+
 
 class CoinScanApp(tk.Tk):
     def __init__(self):
@@ -52,7 +54,7 @@ class CoinScanApp(tk.Tk):
         top_bar = tk.Frame(self, bg=COLORS["topbar_bg"], height=48)
         top_bar.pack(side="top", fill="x")
 
-        # Logo (left side, always SIZES["logo_width"] x SIZES["logo_width"], aligned to window border)
+        # Logo (left side)
         try:
             self.logo_img = Image.open("icon/logo.png").resize(
                 (SIZES["logo_width"], SIZES["logo_width"])
@@ -60,9 +62,10 @@ class CoinScanApp(tk.Tk):
             self.logo_photo = ImageTk.PhotoImage(self.logo_img)
         except Exception:
             self.logo_photo = None
-
         if self.logo_photo:
-            self.logo_label = tk.Label(top_bar, image=self.logo_photo, bg=COLORS["topbar_bg"])
+            self.logo_label = tk.Label(
+                top_bar, image=self.logo_photo, bg=COLORS["topbar_bg"]
+            )
             self.logo_label.pack(side="left", padx=(0, 0))  # Flush to window border
 
         self.title_label = tk.Label(
@@ -89,7 +92,6 @@ class CoinScanApp(tk.Tk):
             bg=COLORS["topbar_bg"],
             command=lambda: self.set_language("en"),
         ).pack(side="left", padx=2)
-        # Spacer between language and contrast buttons
         tk.Frame(topbar_controls, width=16, bg=COLORS["topbar_bg"]).pack(side="left")
         self.contrast_btn = tk.Button(
             topbar_controls,
@@ -107,7 +109,11 @@ class CoinScanApp(tk.Tk):
         )
         self.sidebar.pack(side="left", fill="y")
         self.sidebar_buttons = []
+
+        # Sidebar navigation buttons (except Exit)
         for idx, icon in enumerate(SIDEBAR_ICONS):
+            if idx == 3:
+                continue  # Skip Exit button here
             if idx == 0:
                 btn = tk.Button(
                     self.sidebar,
@@ -141,19 +147,10 @@ class CoinScanApp(tk.Tk):
                     relief="flat",
                     command=self.show_about,
                 )
-            elif idx == 3:
-                btn = tk.Button(
-                    self.sidebar,
-                    text=icon,
-                    font=FONTS["sidebar"],
-                    bg=COLORS["sidebar_bg"],
-                    fg=COLORS["sidebar_fg"],
-                    bd=0,
-                    relief="flat",
-                    command=self.confirm_exit,
-                )
             btn.pack(pady=20)
             self.sidebar_buttons.append(btn)
+
+        # Version label at the bottom
         self.sidebar_version_label = tk.Label(
             self.sidebar,
             text=f"v{VERSION}",
@@ -162,6 +159,20 @@ class CoinScanApp(tk.Tk):
             fg=COLORS["sidebar_fg"],
         )
         self.sidebar_version_label.pack(side="bottom", pady=10)
+
+        # Exit button under version label
+        exit_btn = tk.Button(
+            self.sidebar,
+            text=SIDEBAR_ICONS[3],  # Exit icon
+            font=FONTS["sidebar"],
+            bg=COLORS["sidebar_bg"],
+            fg=COLORS["sidebar_fg"],
+            bd=0,
+            relief="flat",
+            command=self.confirm_exit,
+        )
+        exit_btn.pack(side="bottom", pady=20)
+        self.sidebar_buttons.append(exit_btn)
 
         # Main content area
         main_content = tk.Frame(self, bg=COLORS["background"])
@@ -249,7 +260,7 @@ class CoinScanApp(tk.Tk):
         )
         self.total_label.pack(pady=(0, 10))
 
-        # Footer (left-aligned copyright with extra padding)
+        # Footer (left-aligned copyright)
         self.footer = tk.Frame(
             self, bg=COLORS["topbar_bg"], height=SIZES["footer_height"]
         )
@@ -261,7 +272,7 @@ class CoinScanApp(tk.Tk):
             bg=COLORS["topbar_bg"],
             fg=COLORS["sidebar_bg"],
             anchor="w",
-            justify="left"
+            justify="left",
         )
         self.footer_label.pack(padx=16, pady=8, side="left")
 
@@ -338,7 +349,6 @@ class CoinScanApp(tk.Tk):
         self.results_panel.config(bg=bg_panel)
         self.results_label.config(bg=bg_panel, fg=fg_panel)
         self.total_label.config(bg=bg_panel, fg=fg_panel)
-        # Footer adapts to contrast mode
         self.footer.config(bg=bg_panel)
         self.footer_label.config(bg=bg_panel, fg=sidebar_bg)
 
@@ -412,6 +422,7 @@ class CoinScanApp(tk.Tk):
         self.recognition_list.delete(0, "end")
         self.total_label.config(text=LANGUAGES[self.current_lang]["total"])
         self.webcam_label.config(image="")
+
 
 if __name__ == "__main__":
     app = CoinScanApp()
