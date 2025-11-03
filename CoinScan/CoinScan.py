@@ -1,65 +1,129 @@
-﻿import tkinter as tk
+﻿import os
+import tkinter as tk
 import tkinter.messagebox as messagebox
 from PIL import Image, ImageTk
+
+# Import recognition entry point and UI resources
 from webcam_stream import update_recognition
 from language import LANGUAGES
-from ui_config import COLORS, FONTS, ICON_PATHS, SIZES, SIDEBAR_ICONS, CONTRAST_ICONS
-import os
+from ui_config import (
+    COLORS,
+    FONTS,
+    ICON_PATHS,
+    SIZES,
+    SIDEBAR_ICONS,
+    CONTRAST_ICONS,
+)
 
 VERSION = "1.0.0"
-ABOUT_TEXT = (
-    "CoinScan is a desktop application designed to help users quickly identify and count Euro coins using their computer’s webcam.\n\n"
-    "Key Features:\n"
-    "- Live coin scanning and recognition via webcam\n"
-    "- Automatic detection of coin type and value\n"
-    "- Multilingual interface (English & German)\n"
-    "- High-contrast mode for improved accessibility\n"
-    "- Simple, intuitive design\n\n"
-    "How it works:\n"
-    "Place your coins in view of your webcam and click “Scan Coins.” CoinScan will detect coins in the centre of the image, classify them by colour and size, and display the total value.\n\n"
-    # "Developed for anyone who wants a fast, easy way to count coins—whether for personal use, small businesses, or educational purposes."
-)
+
+# Localized About texts (kept as constants for easy editing/localization)
+ABOUT_TEXTS = {
+    "en": (
+        "CoinScan is a desktop application designed to help users quickly identify and count Euro coins using their computer’s webcam.\n\n"
+        "Key Features:\n"
+        "- Live coin scanning and recognition via webcam\n"
+        "- Automatic detection of coin type and value\n"
+        "- Multilingual interface (English & German)\n"
+        "- High-contrast mode for improved accessibility\n"
+        "- Simple, intuitive design\n\n"
+        "How it works:\n"
+        "Place your coins in view of your webcam and click “Scan Coins.” CoinScan will detect coins in the centre of the image, classify them by colour and size, and display the total value.\n\n"
+    ),
+    "de": (
+        "CoinScan ist eine Desktop-Anwendung, mit der Sie Euro-Münzen schnell mithilfe der Webcam Ihres Computers erkennen und zählen können.\n\n"
+        "Hauptfunktionen:\n"
+        "- Live-Erkennung und -Erfassung von Münzen über die Webcam\n"
+        "- Automatische Bestimmung von Münztyp und -wert\n"
+        "- Mehrsprachige Oberfläche (Englisch & Deutsch)\n"
+        "- Hochkontrastmodus für bessere Barrierefreiheit\n"
+        "- Einfache, intuitive Bedienung\n\n"
+        "So funktioniert’s:\n"
+        "Legen Sie Ihre Münzen in den Sichtbereich der Webcam und klicken Sie auf „Münzen scannen“. CoinScan erkennt die Münzen im Bildzentrum, klassifiziert sie nach Farbe und Größe und zeigt den Gesamtwert an.\n\n"
+    ),
+}
 
 
 def get_flag_img(path):
-    # Build an absolute path relative to this script to avoid escape-sequence
-    # problems and ensure the resource is found regardless of current working dir.
+    """
+    Load and return a Tk-compatible PhotoImage for a flag icon.
+
+    - Builds an absolute path relative to this script (robust to varying CWDs).
+    - Returns a placeholder grey image if loading fails.
+    """
     base = os.path.dirname(__file__)
     full_path = os.path.join(base, path)
     try:
         img = Image.open(full_path).resize(SIZES["flag"])
     except Exception:
+        # Fallback: create a plain grey image so UI remains usable even if resource missing
         img = Image.new("RGB", SIZES["flag"], "grey")
     return ImageTk.PhotoImage(img)
 
 
 class CoinScanApp(tk.Tk):
+    """
+    Main application window.
+
+    Responsibilities:
+    - Build and layout all UI widgets
+    - Apply theme / contrast and font adjustments
+    - Route user actions to backend functions (start_recognition -> webcam_stream.update_recognition)
+    """
+
     def __init__(self):
         super().__init__()
-        self.current_lang = "en"
-        self.current_size = SIZES["webcam_large"]
-        self.high_contrast = False
+
+        # UI state
+        self.current_lang = "en"  # active language key from language.LANGUAGES
+        self.current_size = SIZES["webcam_small"]  # default webcam capture size (Small)
+        self.high_contrast = False  # accessibility toggle
+        self.fullscreen = False  # fullscreen state (F11 toggles, Esc exits)
+
+        # Window setup
         self.title(f"CoinScan v{VERSION}")
         self.geometry(f"{SIZES['window'][0]}x{SIZES['window'][1]}")
-        self.update_idletasks()
+        self.update_idletasks()  # ensure geometry() returns updated values
+
+        # Center window on screen
         screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()
         size = tuple(int(dim) for dim in self.geometry().split("+")[0].split("x"))
         x = (screen_width // 2) - (size[0] // 2)
         y = (screen_height // 2) - (size[1] // 2)
         self.geometry(f"{size[0]}x{size[1]}+{x}+{y}")
+
+        # Visual configuration
         self.configure(bg=COLORS["background"])
         self.resizable(False, False)
+
+        # Fullscreen key bindings
+        self.bind("<F11>", self.toggle_fullscreen)
+        self.bind("<Escape>", self.exit_fullscreen)
+
+        # Build UI and apply initial translations and contrast
         self.create_widgets()
         self.update_language()
         self.apply_contrast()
 
+        # Start in full screen
+        self.set_fullscreen(True)
+
     def create_widgets(self):
+        """
+        Construct all widgets and their layout.
+
+        Widgets are grouped into:
+        - Top bar (logo, title, language flags, contrast)
+        - Sidebar (navigation & exit)
+        - Main content (webcam panel and results panel)
+        - Footer
+        """
         # Top bar
         top_bar = tk.Frame(self, bg=COLORS["topbar_bg"], height=48)
         top_bar.pack(side="top", fill="x")
 
-        # Logo (left side)
+        # Logo (left side). Use try/except so missing file doesn't crash UI.
         try:
             logo_path = os.path.join("icon", "logo.png")
             self.logo_img = Image.open(logo_path).resize(
@@ -68,22 +132,29 @@ class CoinScanApp(tk.Tk):
             self.logo_photo = ImageTk.PhotoImage(self.logo_img)
         except Exception:
             self.logo_photo = None
+
         if self.logo_photo:
+            # Pack logo flush to left border for a compact top bar
             self.logo_label = tk.Label(
                 top_bar, image=self.logo_photo, bg=COLORS["topbar_bg"]
             )
-            self.logo_label.pack(side="left", padx=(0, 0))  # Flush to window border
+            self.logo_label.pack(side="left", padx=(0, 0))
 
+        # Title label (text set in update_language)
         self.title_label = tk.Label(
             top_bar, font=FONTS["title"], bg=COLORS["topbar_bg"]
         )
         self.title_label.pack(side="left", padx=20)
 
-        # Top bar right controls (language flags and contrast)
+        # Top bar right controls: language flags and contrast toggle
         topbar_controls = tk.Frame(top_bar, bg=COLORS["topbar_bg"])
         topbar_controls.pack(side="right", padx=10)
+
+        # Load flag images (safe loader handles missing files)
         self.flag_de = get_flag_img(ICON_PATHS["flag_de"])
         self.flag_en = get_flag_img(ICON_PATHS["flag_en"])
+
+        # Buttons to switch languages
         tk.Button(
             topbar_controls,
             image=self.flag_de,
@@ -98,7 +169,11 @@ class CoinScanApp(tk.Tk):
             bg=COLORS["topbar_bg"],
             command=lambda: self.set_language("en"),
         ).pack(side="left", padx=2)
+
+        # Spacer between language and contrast button
         tk.Frame(topbar_controls, width=16, bg=COLORS["topbar_bg"]).pack(side="left")
+
+        # Contrast toggle button (text updated by apply_contrast)
         self.contrast_btn = tk.Button(
             topbar_controls,
             text=CONTRAST_ICONS["normal"],
@@ -109,55 +184,46 @@ class CoinScanApp(tk.Tk):
         )
         self.contrast_btn.pack(side="left", padx=8)
 
-        # Sidebar (width always matches logo width)
+        # Sidebar (left)
         self.sidebar = tk.Frame(
             self, bg=COLORS["sidebar_bg"], width=SIZES["sidebar_width"]
         )
         self.sidebar.pack(side="left", fill="y")
         self.sidebar_buttons = []
-        # Sidebar navigation buttons (except Exit)
+
+        # Build sidebar navigation buttons from SIDEBAR_ICONS.
+        # The Exit button (index 3) is handled separately and placed at the bottom.
         for idx, icon in enumerate(SIDEBAR_ICONS):
             if idx == 3:
                 continue  # Skip Exit button here
+
+            # Map index -> action
             if idx == 0:
-                btn = tk.Button(
-                    self.sidebar,
-                    text=icon,
-                    font=FONTS["sidebar"],
-                    bg=COLORS["sidebar_bg"],
-                    fg=COLORS["sidebar_fg"],
-                    bd=0,
-                    relief="flat",
-                    command=self.go_home,
-                )
+                cmd = self.go_home
             elif idx == 1:
-                btn = tk.Button(
-                    self.sidebar,
-                    text=icon,
-                    font=FONTS["sidebar"],
-                    bg=COLORS["sidebar_bg"],
-                    fg=COLORS["sidebar_fg"],
-                    bd=0,
-                    relief="flat",
-                    command=self.show_settings,
-                )
+                cmd = self.show_settings
             elif idx == 2:
-                btn = tk.Button(
-                    self.sidebar,
-                    text=icon,
-                    font=FONTS["sidebar"],
-                    bg=COLORS["sidebar_bg"],
-                    fg=COLORS["sidebar_fg"],
-                    bd=0,
-                    relief="flat",
-                    command=self.show_about,
-                )
+                cmd = self.show_about
+            else:
+                cmd = None
+
+            btn = tk.Button(
+                self.sidebar,
+                text=icon,
+                font=FONTS["sidebar"],
+                bg=COLORS["sidebar_bg"],
+                fg=COLORS["sidebar_fg"],
+                bd=0,
+                relief="flat",
+                command=cmd,
+            )
             btn.pack(pady=20)
             self.sidebar_buttons.append(btn)
-        # Exit button under sidebar
+
+        # Exit button placed at bottom of sidebar
         exit_btn = tk.Button(
             self.sidebar,
-            text=SIDEBAR_ICONS[3],  # Exit icon
+            text=SIDEBAR_ICONS[3],  # Exit icon / label
             font=FONTS["sidebar"],
             bg=COLORS["sidebar_bg"],
             fg=COLORS["sidebar_fg"],
@@ -168,23 +234,28 @@ class CoinScanApp(tk.Tk):
         exit_btn.pack(side="bottom", pady=20)
         self.sidebar_buttons.append(exit_btn)
 
-        # Main content area
+        # Main content area (center)
         main_content = tk.Frame(self, bg=COLORS["background"])
         main_content.pack(side="left", fill="both", expand=True, padx=0, pady=0)
 
-        # Webcam panel (left)
+        # Webcam panel (left side of main content)
         self.webcam_panel = tk.Frame(
             main_content, bg=COLORS["panel_bg"], bd=2, relief="groove"
         )
         self.webcam_panel.pack(side="left", padx=40, pady=40, fill="both", expand=True)
-        self.webcam_label = tk.Label(
-            self.webcam_panel, bg="black", fg="white", width=80, height=24
-        )
+
+        # Label that will display webcam frames (image updates done by webcam_stream)
+        # Keep a black background to maximize contrast for the video
+        self.webcam_label = tk.Label(self.webcam_panel, bg="black", fg="white")
         self.webcam_label.pack(pady=10)
+
+        # Listbox to show detection / recognition events
         self.recognition_list = tk.Listbox(
             self.webcam_panel, font=FONTS["listbox"], height=5, width=50
         )
         self.recognition_list.pack(pady=10)
+
+        # Scan button: triggers recognition backend
         self.scan_btn = tk.Button(
             self.webcam_panel,
             font=FONTS["button"],
@@ -199,7 +270,8 @@ class CoinScanApp(tk.Tk):
             command=self.start_recognition,
         )
         self.scan_btn.pack(pady=10)
-        # Size buttons
+
+        # Size selection (only one option now)
         size_frame = tk.Frame(self.webcam_panel, bg=COLORS["panel_bg"])
         size_frame.pack(pady=5)
         self.size_btn_small = tk.Button(
@@ -217,28 +289,15 @@ class CoinScanApp(tk.Tk):
             command=lambda: self.set_size(SIZES["webcam_small"]),
         )
         self.size_btn_small.pack(side="left", padx=5)
-        self.size_btn_large = tk.Button(
-            size_frame,
-            text="800x600",
-            font=FONTS["size_button"],
-            bg=COLORS["button_bg"],
-            fg=COLORS["button_fg"],
-            activebackground=COLORS["button_active_bg"],
-            activeforeground=COLORS["button_active_fg"],
-            relief="raised",
-            bd=0,
-            padx=10,
-            pady=5,
-            command=lambda: self.set_size(SIZES["webcam_large"]),
-        )
-        self.size_btn_large.pack(side="left", padx=5)
-        self.set_size(self.current_size)
 
-        # Font size controls (global)
+        # Global font size controls (A- / A+)
         font_frame = tk.Frame(self.webcam_panel, bg=COLORS["panel_bg"])
         font_frame.pack(pady=(0, 10))
         tk.Label(
-            font_frame, text="Font size:", bg=COLORS["panel_bg"], font=FONTS["button"]
+            font_frame,
+            text="Font size:",
+            bg=COLORS["panel_bg"],
+            font=FONTS["button"],
         ).pack(side="left", padx=(0, 8))
         tk.Button(
             font_frame,
@@ -267,17 +326,19 @@ class CoinScanApp(tk.Tk):
             command=lambda: self.adjust_font_size(1),
         ).pack(side="left", padx=4)
 
-        # Results panel (right)
+        # Results panel (right side of main content)
         self.results_panel = tk.Frame(
             main_content, bg=COLORS["topbar_bg"], bd=2, relief="ridge"
         )
         self.results_panel.pack(side="right", padx=40, pady=40, fill="y")
-        # Results label
+
+        # Results label (title for results area) - text set by update_language
         self.results_label = tk.Label(
             self.results_panel, font=FONTS["results"], bg=COLORS["topbar_bg"]
         )
         self.results_label.pack(pady=(20, 10))
-        # Total label
+
+        # Total label shows total recognized value
         self.total_label = tk.Label(
             self.results_panel,
             font=FONTS["total"],
@@ -302,35 +363,76 @@ class CoinScanApp(tk.Tk):
         )
         self.footer_label.pack(padx=16, pady=8, side="left")
 
+        # Initialize which size button appears selected AFTER results_panel exists
+        self.set_size(self.current_size)
+
     def set_language(self, lang):
+        """
+        Switch the UI language and reapply any contrast rules that depend on language (if any).
+        """
         self.current_lang = lang
         self.update_language()
         self.apply_contrast()
 
     def update_language(self):
+        """
+        Apply language strings to visible widgets.
+
+        Expects LANGUAGES to be a dict mapping language keys to string dicts.
+        """
         strings = LANGUAGES[self.current_lang]
         self.title_label.config(text=strings["title"])
         self.scan_btn.config(text=strings["scan"])
         self.results_label.config(text=strings["results"])
         self.total_label.config(text=strings["total"])
+        # Clear the recognition list whenever language changes to avoid stale text
         self.recognition_list.delete(0, "end")
 
+    def resize_window_for_webcam(self):
+        # Skip geometry changes while in fullscreen
+        if getattr(self, "fullscreen", False):
+            return
+
+        self.update_idletasks()
+        # Safe to access results_panel because create_widgets creates it before set_size is called
+        results_w = max(self.results_panel.winfo_reqwidth(), 320)
+        width = SIZES["sidebar_width"] + 40 + self.current_size[0] + 40 + results_w + 40
+        height = max(
+            self.current_size[1] + 40 + 40 + 48 + SIZES["footer_height"],
+            700,
+        )
+        screen_w = self.winfo_screenwidth()
+        screen_h = self.winfo_screenheight()
+        x = max(0, (screen_w // 2) - (width // 2))
+        y = max(0, (screen_h // 2) - (height // 2))
+        self.geometry(f"{width}x{height}+{x}+{y}")
+
     def set_size(self, size):
+        """
+        Set preferred webcam capture size and update UI state for which size button is active.
+        Actual webcam resolution change happens when the recognition backend reads this value.
+        """
         self.current_size = size
-        if size == SIZES["webcam_small"]:
-            self.size_btn_small.config(relief="sunken")
-            self.size_btn_large.config(relief="raised")
-        else:
-            self.size_btn_small.config(relief="raised")
-            self.size_btn_large.config(relief="sunken")
+        self.size_btn_small.config(
+            relief="sunken" if size == SIZES["webcam_small"] else "raised"
+        )
+        self.resize_window_for_webcam()
 
     def toggle_contrast(self):
+        """
+        Toggle high contrast mode and apply color changes.
+        """
         self.high_contrast = not self.high_contrast
         self.apply_contrast()
 
     def adjust_font_size(self, delta):
-        # Adjust numeric sizes inside FONTS where possible.
-        # FONTS is expected to be a dict of tkinter font descriptions (family, size, ...)
+        """
+        Adjust numeric font sizes inside the shared FONTS dictionary.
+
+        - Supports tkfont.Font instances as well as tuple/list font descriptions.
+        - Ensures font size does not go below a practical minimum (6).
+        - After modifying FONTS entries, this method reapplies updated fonts to visible widgets.
+        """
         from tkinter import font as tkfont
 
         for key, f in FONTS.items():
@@ -347,13 +449,13 @@ class CoinScanApp(tk.Tk):
                     new_size = max(6, f[1] + delta)
                     FONTS[key] = [f[0], new_size] + f[2:]
             except Exception:
+                # Robust: ignore fonts we cannot handle rather than crash the UI
                 continue
 
-        # Apply changes to visible widgets
+        # Reapply changed fonts to widgets that use them
         self.title_label.config(font=FONTS["title"])
         self.scan_btn.config(font=FONTS["button"])
         self.size_btn_small.config(font=FONTS["size_button"])
-        self.size_btn_large.config(font=FONTS["size_button"])
         self.recognition_list.config(font=FONTS["listbox"])
         self.results_label.config(font=FONTS["results"])
         self.total_label.config(font=FONTS["total"])
@@ -361,6 +463,11 @@ class CoinScanApp(tk.Tk):
         self.contrast_btn.config(font=FONTS["button"])
 
     def apply_contrast(self):
+        """
+        Apply color scheme based on the high_contrast flag.
+
+        This swaps colors from ui_config.COLORS to high-contrast variants when needed.
+        """
         if self.high_contrast:
             bg_main = COLORS["contrast_bg"]
             fg_main = COLORS["contrast_fg"]
@@ -385,6 +492,8 @@ class CoinScanApp(tk.Tk):
             sidebar_bg = COLORS["sidebar_bg"]
             sidebar_fg = COLORS["sidebar_fg"]
             contrast_icon = CONTRAST_ICONS["normal"]
+
+        # Apply window and widgets colors consistently
         self.configure(bg=bg_main)
         self.title_label.config(bg=bg_panel, fg=fg_panel)
         self.contrast_btn.config(bg=bg_panel, fg=fg_panel, text=contrast_icon)
@@ -392,16 +501,14 @@ class CoinScanApp(tk.Tk):
         for btn in self.sidebar_buttons:
             btn.config(bg=sidebar_bg, fg=sidebar_fg)
         self.webcam_panel.config(bg=bg_panel)
-        # Always keep webcam label background black
+
+        # Keep the webcam label black for best video contrast; text color reflects entry_fg
         self.webcam_label.config(bg="black", fg=entry_fg)
         self.recognition_list.config(bg=entry_bg, fg=entry_fg)
         self.scan_btn.config(
             bg=btn_bg, fg=btn_fg, activebackground=btn_bg, activeforeground=btn_fg
         )
         self.size_btn_small.config(
-            bg=btn_bg, fg=btn_fg, activebackground=btn_bg, activeforeground=btn_fg
-        )
-        self.size_btn_large.config(
             bg=btn_bg, fg=btn_fg, activebackground=btn_bg, activeforeground=btn_fg
         )
         self.results_panel.config(bg=bg_panel)
@@ -411,6 +518,17 @@ class CoinScanApp(tk.Tk):
         self.footer_label.config(bg=bg_panel, fg=sidebar_bg)
 
     def start_recognition(self):
+        """
+        Trigger the recognition pipeline.
+
+        Delegates to webcam_stream.update_recognition and passes:
+        - scan button widget (so it can be disabled/label changed)
+        - recognition_list Listbox (to display detections)
+        - total_label (to show total value)
+        - webcam_label (to display video frames)
+        - current_size (preferred capture resolution)
+        - current_lang (for localized recognition messages)
+        """
         update_recognition(
             self.scan_btn,
             self.recognition_list,
@@ -421,6 +539,9 @@ class CoinScanApp(tk.Tk):
         )
 
     def show_about(self):
+        """
+        Show About dialog with app metadata and description.
+        """
         about_win = tk.Toplevel(self)
         about_win.title("About CoinScan")
         about_win.resizable(False, False)
@@ -440,7 +561,7 @@ class CoinScanApp(tk.Tk):
         ).pack(padx=20, pady=(0, 10))
         tk.Message(
             about_win,
-            text=ABOUT_TEXT,
+            text=ABOUT_TEXTS.get(self.current_lang, ABOUT_TEXTS["en"]),
             font=FONTS["about_text"],
             bg=COLORS["background"],
             width=400,
@@ -453,6 +574,11 @@ class CoinScanApp(tk.Tk):
         ).pack(pady=(0, 20))
 
     def show_settings(self):
+        """
+        Show Settings dialog.
+
+        Currently a placeholder for future settings; kept as a Toplevel for expansion.
+        """
         settings_win = tk.Toplevel(self)
         settings_win.title("Settings")
         settings_win.resizable(False, False)
@@ -477,6 +603,9 @@ class CoinScanApp(tk.Tk):
         ).pack(pady=(0, 20))
 
     def confirm_exit(self):
+        """
+        Prompt the user to confirm exit using localized string if available.
+        """
         confirm_text = LANGUAGES[self.current_lang].get(
             "exit_confirm", "Are you sure you want to exit CoinScan?"
         )
@@ -484,11 +613,37 @@ class CoinScanApp(tk.Tk):
             self.quit()
 
     def go_home(self):
+        """
+        Reset main UI to initial state:
+        - clear recognition list
+        - reset total label text
+        - clear webcam preview image
+        """
         self.recognition_list.delete(0, "end")
         self.total_label.config(text=LANGUAGES[self.current_lang]["total"])
+        # Clear any image reference in the webcam label
         self.webcam_label.config(image="")
+
+    # ---- Fullscreen helpers ----
+    def set_fullscreen(self, enable: bool = True):
+        """
+        Enable/disable fullscreen. Uses attribute where available, falls back to 'zoomed' state.
+        """
+        self.fullscreen = bool(enable)
+        try:
+            self.attributes("-fullscreen", self.fullscreen)
+        except Exception:
+            # Fallback for platforms not supporting -fullscreen
+            self.state("zoomed" if self.fullscreen else "normal")
+
+    def toggle_fullscreen(self, event=None):
+        self.set_fullscreen(not self.fullscreen)
+
+    def exit_fullscreen(self, event=None):
+        self.set_fullscreen(False)
 
 
 if __name__ == "__main__":
+    # Entry point for running the app directly.
     app = CoinScanApp()
     app.mainloop()

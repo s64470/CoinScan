@@ -31,8 +31,8 @@
     <Content Include="icon\help_icon.png" />
     <Content Include="icon\flag_DE.png" />
     <Content Include="icon\flag_UK.png" />
-    <Content Include="folderstructure" />
     <Content Include="icon\logo.png" />
+    <Content Include="requirements.txt" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="icon\" />

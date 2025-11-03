@@ -1,5 +1,10 @@
 # webcam_stream.py
 # Handles webcam capture and coin recognition logic for CoinScan
+"""
+Module for capturing a single frame from the webcam, detecting a coin near the
+centre of the frame, estimating its colour and size, mapping that to a euro
+denomination and updating the UI widgets.
+"""
 
 import cv2
 import threading
@@ -11,52 +16,80 @@ def update_recognition(
     scan_button, recognition, total_label, webcam_label, current_size, current_lang
 ):
     """
-    Starts a thread to capture a frame from the webcam, detect coins,
-    classify them by colour and size, and update the UI accordingly.
+    Start a background thread to:
+    - Grab a single frame from the default webcam.
+    - Detect circular shapes (coins) using Hough Circle Transform.
+    - Filter coins near the frame centre and choose the largest central coin.
+    - Estimate coin colour by mean HSV hue within the coin mask.
+    - Map colour+radius to a value/label (calibration thresholds are used).
+    - Update UI widgets: a listbox-like `recognition`, a `total_label` and the
+      `webcam_label` image. The `scan_button` is disabled while scanning.
+    Parameters:
+      scan_button: UI button widget that triggers the scan (will be disabled).
+      recognition: UI list widget to display recognition results (cleared then updated).
+      total_label: UI label to show total amount detected.
+      webcam_label: UI label/widget where the frame image is shown.
+      current_size: tuple(width, height) used to set webcam resolution and resize image.
+      current_lang: "de" for German messages, any other value for English.
     """
-    scan_button.config(state="disabled")  # Disable scan button during scan
+    # Disable scan button to prevent concurrent scans
+    scan_button.config(state="disabled")
 
     def stream():
-        # Open webcam and set resolution
+        # Open default camera (index 0) and try to set requested resolution.
         cap = cv2.VideoCapture(0)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, current_size[0])
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, current_size[1])
         if not cap.isOpened():
+            # If webcam couldn't be opened, re-enable button and exit.
             scan_button.config(state="normal")
             return
 
+        # Grab a single frame from the camera
         ret, frame = cap.read()
         if not ret:
+            # If frame capture failed, release camera, re-enable button and exit.
             scan_button.config(state="normal")
             cap.release()
             return
 
-        # Preprocess frame for circle (coin) detection
+        # Convert to grayscale and apply median blur to reduce noise prior to circle detection.
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         gray_blur = cv2.medianBlur(gray, 7)
+
+        # HoughCircles parameters:
+        # dp=1.2 -> accumulator resolution relative to image resolution
+        # minDist=30 -> minimum distance between circle centres (prevents duplicates)
+        # param1=50 -> higher threshold for Canny edge detector
+        # param2=16 -> accumulator threshold for circle detection (lower -> more false positives)
+        # minRadius/maxRadius -> expected coin size range in pixels (calibrate per camera setup)
         circles = cv2.HoughCircles(
             gray_blur,
             cv2.HOUGH_GRADIENT,
             dp=1.2,
             minDist=30,
             param1=50,
-            param2=16,  # You can increase this to reduce false positives
-            minRadius=15,  # Adjust to match your smallest coin
-            maxRadius=90,  # Adjust to match your largest coin
+            param2=16,
+            minRadius=15,
+            maxRadius=90,
         )
 
+        # Prepare UI output variables
         recognition.delete(0, "end")  # Clear previous recognition results
         found = False
         total = 0.0
 
         if circles is not None:
+            # Round circle parameters to unsigned 16-bit ints (x, y, radius)
             circles = np.uint16(np.around(circles))
+
+            # Compute centre of the frame and tolerances (20% of frame size)
             frame_centre_x = frame.shape[1] // 2
             frame_centre_y = frame.shape[0] // 2
             tolerance_x = frame.shape[1] * 0.2
             tolerance_y = frame.shape[0] * 0.2
 
-            # Filter coins near the centre of the frame
+            # Filter detected circles to those whose centres lie within the central tolerance box.
             centre_coins = [
                 (x, y, r)
                 for (x, y, r) in circles[0, :]
@@ -65,19 +98,26 @@ def update_recognition(
             ]
 
             if centre_coins:
-                # Use the largest coin in the centre
+                # If multiple central coins, pick the largest (assumes closest coin is relevant)
                 x, y, r = max(centre_coins, key=lambda c: c[2])
+
+                # Create a mask for the detected coin region and extract coin pixels.
                 mask = np.zeros(gray.shape, dtype=np.uint8)
                 cv2.circle(mask, (x, y), r, 255, -1)
                 coin_pixels = cv2.bitwise_and(frame, frame, mask=mask)
+
+                # Convert masked coin region to HSV and compute mean hue for colour estimation.
                 coin_hsv = cv2.cvtColor(coin_pixels, cv2.COLOR_BGR2HSV)
+                # Select hue channel values where mask is set; convert to float for averaging.
                 coin_hue = coin_hsv[:, :, 0][mask == 255].astype(np.float64)
                 mean_hue = np.mean(coin_hue) if coin_hue.size > 0 else 0.0
 
+                # Log detection details to console (useful for calibration/debugging)
                 print(f"Detected coin: radius={r}, mean_hue={mean_hue:.1f}")
 
                 # --- Calibration Section ---
-                # Adjust these thresholds based on your coins and lighting!
+                # Determine a simple colour label based on mean hue thresholds.
+                # These thresholds depend heavily on lighting, camera and coin surface.
                 if 18 < mean_hue < 35:
                     colour_label = "Gold"
                 elif 8 < mean_hue <= 18:
@@ -85,7 +125,8 @@ def update_recognition(
                 else:
                     colour_label = "Silver"
 
-                # Assign value and label based on colour and size
+                # Map colour and radius to a euro coin value and label.
+                # These radius thresholds are heuristics and should be calibrated for your camera.
                 if colour_label == "Gold" and r > 52:
                     value = 2.00
                     label = "2€"
@@ -105,18 +146,19 @@ def update_recognition(
                     value = 0.05
                     label = "Unknown"
 
+                # Accumulate total and update recognition list widget with details.
                 total += value
                 recognition.insert(
                     "end",
                     f"Coin: {label} ({colour_label}, radius: {r}, hue: {mean_hue:.1f})",
                 )
 
-                # Draw detected coin on frame
+                # Draw annotation circles on the frame for visual feedback (green circle + red centre dot).
                 cv2.circle(frame, (x, y), r, (0, 255, 0), 2)
                 cv2.circle(frame, (x, y), 2, (0, 0, 255), 3)
                 found = True
 
-        # If no coin found, show message in selected language
+        # If no coin was detected, show a localized message in the recognition widget.
         if not found:
             msg = (
                 "Keine Münze im Zentrum erkannt."
@@ -125,21 +167,23 @@ def update_recognition(
             )
             recognition.insert("end", msg)
 
-        # Update total label in selected language
+        # Update the total label using the selected language formatting.
         total_text = (
             f"GESAMT: {total:.2f} €" if current_lang == "de" else f"TOTAL: €{total:.2f}"
         )
         total_label.config(text=total_text)
 
-        # Update webcam image in UI
+        # Convert frame to RGB, resize for the UI and update the webcam display widget.
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         img = Image.fromarray(frame_rgb).resize(current_size)
         imgtk = ImageTk.PhotoImage(image=img)
+        # Keep a reference to the PhotoImage so it isn't garbage collected by Tk.
         webcam_label.imgtk = imgtk
         webcam_label.configure(image=imgtk)
 
+        # Release the camera and re-enable the scan button.
         cap.release()
         scan_button.config(state="normal")
 
-    # Start recognition in a separate thread to keep UI responsive
+    # Launch the capture & recognition in a daemon thread to keep the main UI responsive.
     threading.Thread(target=stream, daemon=True).start()
