@@ -1,43 +1,70 @@
-# SECURITY.md
+﻿# SECURITY.md
 
-## Security Policy
+# Security Policy
 
-### Supported Versions
-
-| Version | Supported          |
-| ------- | ------------------ |
-| 1.0.0   | :white_check_mark: |
-
----
+Thank you for helping keep CoinScan and its users safe.
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in CoinScan, **please do not open a public issue**.  
-Instead, report it privately to the maintainer:
+- Do NOT open a public issue for security reports.
+- Preferred: Use GitHub’s private reporting flow (Security tab → Report a vulnerability / GitHub Security Advisory).
+- Fallback: Email the maintainer at Daniel.Riel@prosegur.com.
 
-- **Email:** Daniel.Riel@prosegur.com
+Please include:
 
-We will respond as quickly as possible and coordinate a fix.
+- Description and impact of the issue
+- Steps to reproduce and minimal proof of concept
+- Affected commit/versions and environment details (OS, Python, package versions)
+- Any suggested remediation or mitigations
 
----
+We will acknowledge receipt within 3 business days and keep you informed of progress.
 
-## Security Best Practices
+## Coordinated Disclosure
 
-- **Run Locally:** Only run CoinScan on trusted machines. The application accesses your webcam and local files.
-- **Dependencies:** Ensure you install dependencies (OpenCV, Pillow, Tkinter) from official sources (e.g., PyPI).
-- **No Network Transmission:** CoinScan does not transmit data over the internet. If you modify the code to add network features, review for security risks.
-- **Webcam Access:** The application accesses your webcam. Always close the app when not in use to prevent unauthorized access.
-- **File Handling:** The app does not write files by default. If you add file saving features, validate all file paths and sanitize user input.
+- We follow responsible disclosure. After triage and confirmation, we will:
+  - Develop and validate a fix promptly
+  - Target public disclosure within 90 days, or sooner when a fix is available
+  - Credit reporters who wish to be acknowledged after a fix ships
+- Please refrain from public disclosure until we release a fix.
 
----
+## Supported Versions
 
-## Responsible Disclosure
+We generally provide security fixes for:
 
-We encourage responsible disclosure. Please provide as much information as possible, including:
+- The `master` branch (latest)
+- The latest tagged release
 
-- Steps to reproduce the vulnerability
-- Potential impact
-- Any suggested fixes
+Older releases may receive fixes on a best-effort basis only.
+
+## Dependency Security
+
+- Python dependencies are declared in `requirements.txt`.
+- We periodically review and update dependencies to address known CVEs.
+- If you discover a vulnerability in a dependency that affects CoinScan, include the exact package and version in your report.
+
+## Project Security Notes
+
+- CoinScan is a local GUI application that may access your webcam and local files.
+- By default, it does not transmit data over the network. If you extend it with network features, review for security/privacy risks.
+- When adding file I/O, validate and sanitize all file paths and user-controlled inputs.
+
+## Safe Harbor
+
+We support good-faith security research and will not pursue legal action for:
+
+- Testing that avoids privacy violations, data destruction, or service degradation
+- Reporting vulnerabilities via the private advisory process
+- Making a good-faith effort to respect scope and not access data you do not own
+
+## Scope
+
+- In scope: Code in this repository and its default configurations.
+- Out of scope: Vulnerabilities exclusively in third-party dependencies (report upstream), unless the impact is unique to CoinScan’s usage.
+
+## After a Fix
+
+- We will publish release notes that describe the issue (to a reasonable extent), impact, and upgrade guidance.
+- Update to the latest version and reinstall dependencies from `requirements.txt`.
 
 ---
 
