@@ -1,7 +1,7 @@
 ﻿import os
 import tkinter as tk
 import tkinter.messagebox as messagebox
-from PIL import Image, ImageTk
+from PIL import Image, ImageTk, ImageDraw
 
 # Import recognition entry point and UI resources
 from webcam_stream import update_recognition
@@ -59,6 +59,80 @@ def get_flag_img(path):
         # Fallback: create a plain grey image so UI remains usable even if resource missing
         img = Image.new("RGB", SIZES["flag"], "grey")
     return ImageTk.PhotoImage(img)
+
+
+def load_logo_photo() -> ImageTk.PhotoImage | None:
+    """
+    Try to load `icon/logo-prosegur.png` and return a PhotoImage.
+    Fallback order:
+      - PNG at `icon/logo-prosegur.png`
+      - Generated placeholder bitmap
+    Returns None only if everything fails.
+    """
+    base = os.path.dirname(__file__)
+    size = (SIZES["logo_width"], SIZES["logo_width"])
+    png_path = os.path.join(base, "icon", "logo-prosegur.png")
+
+    # PNG preferred
+    if os.path.exists(png_path):
+        try:
+            img = Image.open(png_path).convert("RGBA")
+            img = img.resize(size, Image.LANCZOS)
+            return ImageTk.PhotoImage(img)
+        except Exception:
+            pass
+
+    # Generated placeholder (simple black circle with P)
+    try:
+        img = Image.new("RGBA", size, (0, 0, 0, 0))
+        d = ImageDraw.Draw(img)
+        r = size[0] // 2 - 2
+        cx = cy = size[0] // 2
+        d.ellipse((cx - r, cy - r, cx + r, cy + r), fill="#000000")
+        # Minimalistic P
+        d.rectangle((cx - r // 3, cy - r // 2, cx - r // 6, cy + r // 2), fill="#FFD100")
+        d.ellipse((cx - r // 6, cy - r // 3, cx + r // 2, cy + r // 3), outline="#FFD100", width=3)
+        return ImageTk.PhotoImage(img)
+    except Exception:
+        return None
+
+
+def generate_prosegur_globe_bg(width: int, height: int) -> Image.Image:
+    """
+    Generate a corporate-style Prosegur background with exactly ONE globe watermark:
+    - Base corporate yellow (#FFD100).
+    - Single faded globe (centered) with latitude/longitude lines.
+    """
+    bg_color = COLORS.get("background", "#FFD100")
+    width = max(64, int(width))
+    height = max(64, int(height))
+
+    base = Image.new("RGB", (width, height), bg_color)
+    overlay = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+
+    def draw_globe(cx, cy, radius, stroke_alpha=65, stroke_width=4):
+        stroke = (0, 0, 0, stroke_alpha)
+        # Outer circle
+        draw.ellipse((cx - radius, cy - radius, cx + radius, cy + radius), outline=stroke, width=stroke_width)
+        # Longitudes (vertical + two offsets)
+        for offset in (-0.45, 0, 0.45):
+            ox = int(radius * offset)
+            draw.ellipse((cx - ox - radius, cy - radius, cx - ox + radius, cy + radius), outline=stroke, width=1)
+        # Latitudes (three horizontal arcs)
+        for frac in (-0.5, 0, 0.5):
+            ry = int(radius * (0.65 + 0.25 * frac))
+            draw.ellipse((cx - radius, cy - ry, cx + radius, cy + ry), outline=stroke, width=1)
+        # Equator emphasized
+        draw.line([(cx - radius, cy), (cx + radius, cy)], fill=stroke, width=2)
+
+    # Single centered globe watermark
+    globe_radius = int(min(width, height) * 0.32)
+    draw_globe(width // 2, height // 2, globe_radius)
+
+    base = base.convert("RGBA")
+    base.alpha_composite(overlay)
+    return base.convert("RGB")
 
 
 class CoinScanApp(tk.Tk):
@@ -123,22 +197,18 @@ class CoinScanApp(tk.Tk):
         top_bar = tk.Frame(self, bg=COLORS["topbar_bg"], height=48)
         top_bar.pack(side="top", fill="x")
 
-        # Logo (left side). Use try/except so missing file doesn't crash UI.
-        try:
-            logo_path = os.path.join("icon", "logo.png")
-            self.logo_img = Image.open(logo_path).resize(
-                (SIZES["logo_width"], SIZES["logo_width"])
-            )
-            self.logo_photo = ImageTk.PhotoImage(self.logo_img)
-        except Exception:
-            self.logo_photo = None
-
-        if self.logo_photo:
-            # Pack logo flush to left border for a compact top bar
+        # Logo (left side) - load Prosegur SVG/PNG or fallback
+        self.logo_photo = load_logo_photo()
+        if self.logo_photo is not None:
             self.logo_label = tk.Label(
                 top_bar, image=self.logo_photo, bg=COLORS["topbar_bg"]
             )
             self.logo_label.pack(side="left", padx=(0, 0))
+        else:
+            self.logo_label = tk.Label(
+                top_bar, text="PROSEGUR", font=("Segoe UI", 14, "bold"), bg=COLORS["topbar_bg"]
+            )
+            self.logo_label.pack(side="left", padx=(8, 0))
 
         # Title label (text set in update_language)
         self.title_label = tk.Label(
@@ -235,12 +305,25 @@ class CoinScanApp(tk.Tk):
         self.sidebar_buttons.append(exit_btn)
 
         # Main content area (center)
-        main_content = tk.Frame(self, bg=COLORS["background"])
-        main_content.pack(side="left", fill="both", expand=True, padx=0, pady=0)
+        self.main_content = tk.Frame(self, bg=COLORS["background"])
+        self.main_content.pack(side="left", fill="both", expand=True, padx=0, pady=0)
+
+        # Background image label for main content (globe watermark)
+        self._bg_image = None
+        self.bg_label = tk.Label(self.main_content, bd=0)
+        self.bg_label.place(x=0, y=0, relwidth=1, relheight=1)
+        self.bg_label.lower()  # ensure it stays behind other widgets
+
+        # Render initial background and update on size changes
+        self.main_content.bind("<Configure>", self._on_main_content_resize)
+        self._render_background_image(
+            max(2, self.main_content.winfo_width()),
+            max(2, self.main_content.winfo_height()),
+        )
 
         # Webcam panel (left side of main content)
         self.webcam_panel = tk.Frame(
-            main_content, bg=COLORS["panel_bg"], bd=2, relief="groove"
+            self.main_content, bg=COLORS["panel_bg"], bd=2, relief="groove"
         )
         self.webcam_panel.pack(side="left", padx=40, pady=40, fill="both", expand=True)
 
@@ -328,7 +411,7 @@ class CoinScanApp(tk.Tk):
 
         # Results panel (right side of main content)
         self.results_panel = tk.Frame(
-            main_content, bg=COLORS["topbar_bg"], bd=2, relief="ridge"
+            self.main_content, bg=COLORS["topbar_bg"], bd=2, relief="ridge"
         )
         self.results_panel.pack(side="right", padx=40, pady=40, fill="y")
 
@@ -365,6 +448,21 @@ class CoinScanApp(tk.Tk):
 
         # Initialize which size button appears selected AFTER results_panel exists
         self.set_size(self.current_size)
+
+    def _on_main_content_resize(self, event):
+        # Skip when in high-contrast mode or minimized sizes
+        if getattr(self, "high_contrast", False):
+            return
+        self._render_background_image(max(2, event.width), max(2, event.height))
+
+    def _render_background_image(self, width: int, height: int):
+        try:
+            img = generate_prosegur_globe_bg(width, height)
+            self._bg_image = ImageTk.PhotoImage(img)
+            self.bg_label.config(image=self._bg_image)
+        except Exception:
+            # If generation fails, fall back to solid background color
+            self.bg_label.config(image="")
 
     def set_language(self, lang):
         """
@@ -516,6 +614,16 @@ class CoinScanApp(tk.Tk):
         self.total_label.config(bg=bg_panel, fg=fg_panel)
         self.footer.config(bg=bg_panel)
         self.footer_label.config(bg=bg_panel, fg=sidebar_bg)
+
+        # Background image visibility according to contrast mode
+        if hasattr(self, "bg_label"):
+            if self.high_contrast:
+                self.bg_label.config(image="")
+            else:
+                # regenerate for current size
+                w = max(2, self.main_content.winfo_width())
+                h = max(2, self.main_content.winfo_height())
+                self._render_background_image(w, h)
 
     def start_recognition(self):
         """

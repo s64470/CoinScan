@@ -20,11 +20,13 @@ LOGO_WIDTH = 50  # pixels
 # Colour palette for the app.
 # Keys represent logical UI areas; values are color strings (hex or named colours supported by the toolkit).
 COLORS = {
-    "background": "#f4f6f8",  # Main window background colour
+    # Updated to Prosegur corporate yellow (approximate hex: #FFD100)
+    # Source: Public brand colour references (Pantone 109C / Prosegur Yellow)
+    "background": "#FFD100",  # Main window background colour (Prosegur Yellow)
     "panel_bg": "white",  # Panel / card background colour
     "sidebar_bg": "#2c3e50",  # Sidebar background (dark blue/gray)
     "sidebar_fg": "white",  # Sidebar foreground (text/icons)
-    "topbar_bg": "#f8f8f8",  # Top bar / header background
+    "topbar_bg": "#FFD100",  # Match top bar with corporate yellow for consistency
     "button_bg": "#3498db",  # Primary button background (blue)
     "button_fg": "white",  # Primary button text colour
     "button_active_bg": "#2980b9",  # Button background when hovered/active

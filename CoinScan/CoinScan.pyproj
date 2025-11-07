@@ -33,6 +33,7 @@
     <Content Include="icon\flag_DE.png" />
     <Content Include="icon\flag_UK.png" />
     <Content Include="icon\logo.png" />
+    <Content Include="icon\logo-prosegur.png" />
     <Content Include="requirements.txt" />
   </ItemGroup>
   <ItemGroup>
