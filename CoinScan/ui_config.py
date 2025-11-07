@@ -14,6 +14,8 @@ COLORS = {
     "results_fg": "#3498db",
     "footer_bg": "#FFD100",
     "footer_fg": "#000000",
+    # New: lighter yellow for listbox background
+    "listbox_bg": "#FFE680",
     "contrast_bg": "#000000",
     "contrast_fg": "#FFFF00",
     "contrast_panel_bg": "#000000",

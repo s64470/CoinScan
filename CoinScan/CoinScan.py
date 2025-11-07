@@ -141,15 +141,23 @@ def generate_globe_icon(diameter: int = 40) -> Image.Image:
     cx = cy = diameter // 2
     stroke = (0, 0, 0, 180)
     # Outer circle
-    draw.ellipse((cx - radius, cy - radius, cx + radius, cy + radius), outline=stroke, width=3)
+    draw.ellipse(
+        (cx - radius, cy - radius, cx + radius, cy + radius), outline=stroke, width=3
+    )
     # Longitudes
     for offset in (-0.45, 0, 0.45):
         ox = int(radius * offset)
-        draw.ellipse((cx - ox - radius, cy - radius, cx - ox + radius, cy + radius), outline=stroke, width=1)
+        draw.ellipse(
+            (cx - ox - radius, cy - radius, cx - ox + radius, cy + radius),
+            outline=stroke,
+            width=1,
+        )
     # Latitudes
     for frac in (-0.5, 0, 0.5):
         ry = int(radius * (0.65 + 0.25 * frac))
-        draw.ellipse((cx - radius, cy - ry, cx + radius, cy + ry), outline=stroke, width=1)
+        draw.ellipse(
+            (cx - radius, cy - ry, cx + radius, cy + ry), outline=stroke, width=1
+        )
     # Equator
     draw.line([(cx - radius, cy), (cx + radius, cy)], fill=stroke, width=2)
     return img
@@ -441,7 +449,9 @@ class CoinScanApp(tk.Tk):
         self.scan_btn.pack(pady=10)
 
         # Size selection (only one option now)
-        self.size_frame = tk.Frame(self.webcam_panel, bg=COLORS["background"])  # transparent look
+        self.size_frame = tk.Frame(
+            self.webcam_panel, bg=COLORS["background"]
+        )  # transparent look
         self.size_frame.pack(pady=5)
         self.size_btn_small = tk.Button(
             self.size_frame,
@@ -460,7 +470,9 @@ class CoinScanApp(tk.Tk):
         self.size_btn_small.pack(side="left", padx=5)
 
         # Global font size controls (A- / A+)
-        self.font_frame = tk.Frame(self.webcam_panel, bg=COLORS["background"])  # transparent look
+        self.font_frame = tk.Frame(
+            self.webcam_panel, bg=COLORS["background"]
+        )  # transparent look
         self.font_frame.pack(pady=(0, 10))
         self.fontsize_label = tk.Label(
             self.font_frame,
@@ -701,6 +713,8 @@ class CoinScanApp(tk.Tk):
             sidebar_fg = COLORS["contrast_sidebar_fg"]
             contrast_icon = CONTRAST_ICONS["contrast"]
             border_color = COLORS["contrast_fg"]
+            listbox_bg = entry_bg
+            listbox_fg = entry_fg
         else:
             bg_main = COLORS["background"]
             fg_main = "#000000"
@@ -714,6 +728,8 @@ class CoinScanApp(tk.Tk):
             sidebar_fg = COLORS["sidebar_fg"]
             contrast_icon = CONTRAST_ICONS["normal"]
             border_color = "#000000"
+            listbox_bg = COLORS.get("listbox_bg", entry_bg)
+            listbox_fg = entry_fg
 
         # Apply window and widgets colors consistently
         self.configure(bg=bg_main)
@@ -722,7 +738,9 @@ class CoinScanApp(tk.Tk):
         self.title_label.config(bg=COLORS["topbar_bg"], fg="#000000")
         if hasattr(self, "logo_label"):
             self.logo_label.config(bg=COLORS["topbar_bg"])
-        self.contrast_btn.config(bg=COLORS["topbar_bg"], fg="#000000", text=contrast_icon)
+        self.contrast_btn.config(
+            bg=COLORS["topbar_bg"], fg="#000000", text=contrast_icon
+        )
         self.sidebar.config(bg=sidebar_bg)
         for btn in self.sidebar_buttons:
             btn.config(bg=sidebar_bg, fg=sidebar_fg)
@@ -744,11 +762,23 @@ class CoinScanApp(tk.Tk):
             self.webcam_label.config(bg=bg_main)
         if hasattr(self, "logo_label"):
             self.logo_label.config(bg=COLORS["topbar_bg"])
-        self.recognition_list.config(bg=entry_bg, fg=entry_fg)
-        self.scan_btn.config(bg=btn_bg, fg=btn_fg, activebackground=btn_bg, activeforeground=btn_fg)
-        self.size_btn_small.config(bg=btn_bg, fg=btn_fg, activebackground=btn_bg, activeforeground=btn_fg)
+        # Use lighter yellow listbox in normal mode
+        self.recognition_list.config(bg=listbox_bg, fg=listbox_fg)
+        self.scan_btn.config(
+            bg=btn_bg, fg=btn_fg, activebackground=btn_bg, activeforeground=btn_fg
+        )
+        self.size_btn_small.config(
+            bg=btn_bg, fg=btn_fg, activebackground=btn_bg, activeforeground=btn_fg
+        )
         # Results panel: transparent background with visible border
-        self.results_panel.config(bg=bg_main, bd=0, relief="flat", highlightthickness=2, highlightbackground=border_color, highlightcolor=border_color)
+        self.results_panel.config(
+            bg=bg_main,
+            bd=0,
+            relief="flat",
+            highlightthickness=2,
+            highlightbackground=border_color,
+            highlightcolor=border_color,
+        )
         # Keep labels yellow in normal mode
         if self.high_contrast:
             self.results_label.config(bg=bg_panel, fg=fg_panel)
