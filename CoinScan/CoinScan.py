@@ -2,10 +2,11 @@
 import tkinter as tk
 import tkinter.messagebox as messagebox
 from PIL import Image, ImageTk, ImageDraw
+from typing import Optional
 
 # Import recognition entry point and UI resources
 from webcam_stream import update_recognition
-from language import LANGUAGES
+from language import LANGUAGES, ABOUT_TEXTS
 from ui_config import (
     COLORS,
     FONTS,
@@ -16,33 +17,6 @@ from ui_config import (
 )
 
 VERSION = "1.0.0"
-
-# Localized About texts (kept as constants for easy editing/localization)
-ABOUT_TEXTS = {
-    "en": (
-        "CoinScan is a desktop application designed to help users quickly identify and count Euro coins using their computer’s webcam.\n\n"
-        "Key Features:\n"
-        "- Live coin scanning and recognition via webcam\n"
-        "- Automatic detection of coin type and value\n"
-        "- Multilingual interface (English & German)\n"
-        "- High-contrast mode for improved accessibility\n"
-        "- Simple, intuitive design\n\n"
-        "How it works:\n"
-        "Place your coins in view of your webcam and click “Scan Coins.” CoinScan will detect coins in the centre of the image, classify them by colour and size, and display the total value.\n\n"
-    ),
-    "de": (
-        "CoinScan ist eine Desktop-Anwendung, mit der Sie Euro-Münzen schnell mithilfe der Webcam Ihres Computers erkennen und zählen können.\n\n"
-        "Hauptfunktionen:\n"
-        "- Live-Erkennung und -Erfassung von Münzen über die Webcam\n"
-        "- Automatische Bestimmung von Münztyp und -wert\n"
-        "- Mehrsprachige Oberfläche (Englisch & Deutsch)\n"
-        "- Hochkontrastmodus für bessere Barrierefreiheit\n"
-        "- Einfache, intuitive Bedienung\n\n"
-        "So funktioniert’s:\n"
-        "Legen Sie Ihre Münzen in den Sichtbereich der Webcam und klicken Sie auf „Münzen scannen“. CoinScan erkennt die Münzen im Bildzentrum, klassifiziert sie nach Farbe und Größe und zeigt den Gesamtwert an.\n\n"
-    ),
-}
-
 
 def get_flag_img(path):
     """
@@ -61,7 +35,7 @@ def get_flag_img(path):
     return ImageTk.PhotoImage(img)
 
 
-def load_logo_photo() -> ImageTk.PhotoImage | None:
+def load_logo_photo() -> Optional[ImageTk.PhotoImage]:
     """
     Try to load `icon/logo-prosegur.png` and return a PhotoImage.
     Fallback order:
@@ -90,8 +64,14 @@ def load_logo_photo() -> ImageTk.PhotoImage | None:
         cx = cy = size[0] // 2
         d.ellipse((cx - r, cy - r, cx + r, cy + r), fill="#000000")
         # Minimalistic P
-        d.rectangle((cx - r // 3, cy - r // 2, cx - r // 6, cy + r // 2), fill="#FFD100")
-        d.ellipse((cx - r // 6, cy - r // 3, cx + r // 2, cy + r // 3), outline="#FFD100", width=3)
+        d.rectangle(
+            (cx - r // 3, cy - r // 2, cx - r // 6, cy + r // 2), fill="#FFD100"
+        )
+        d.ellipse(
+            (cx - r // 6, cy - r // 3, cx + r // 2, cy + r // 3),
+            outline="#FFD100",
+            width=3,
+        )
         return ImageTk.PhotoImage(img)
     except Exception:
         return None
@@ -114,15 +94,25 @@ def generate_prosegur_globe_bg(width: int, height: int) -> Image.Image:
     def draw_globe(cx, cy, radius, stroke_alpha=65, stroke_width=4):
         stroke = (0, 0, 0, stroke_alpha)
         # Outer circle
-        draw.ellipse((cx - radius, cy - radius, cx + radius, cy + radius), outline=stroke, width=stroke_width)
+        draw.ellipse(
+            (cx - radius, cy - radius, cx + radius, cy + radius),
+            outline=stroke,
+            width=stroke_width,
+        )
         # Longitudes (vertical + two offsets)
         for offset in (-0.45, 0, 0.45):
             ox = int(radius * offset)
-            draw.ellipse((cx - ox - radius, cy - radius, cx - ox + radius, cy + radius), outline=stroke, width=1)
+            draw.ellipse(
+                (cx - ox - radius, cy - radius, cx - ox + radius, cy + radius),
+                outline=stroke,
+                width=1,
+            )
         # Latitudes (three horizontal arcs)
         for frac in (-0.5, 0, 0.5):
             ry = int(radius * (0.65 + 0.25 * frac))
-            draw.ellipse((cx - radius, cy - ry, cx + radius, cy + ry), outline=stroke, width=1)
+            draw.ellipse(
+                (cx - radius, cy - ry, cx + radius, cy + ry), outline=stroke, width=1
+            )
         # Equator emphasized
         draw.line([(cx - radius, cy), (cx + radius, cy)], fill=stroke, width=2)
 
@@ -133,6 +123,67 @@ def generate_prosegur_globe_bg(width: int, height: int) -> Image.Image:
     base = base.convert("RGBA")
     base.alpha_composite(overlay)
     return base.convert("RGB")
+
+
+class Tooltip:
+    def __init__(self, widget, text_func, delay=400):
+        self.widget = widget
+        self.text_func = (
+            text_func  # callable returning current text (for live language swap)
+        )
+        self.delay = delay
+        self._id = None
+        self.tip = None
+        widget.bind("<Enter>", self._schedule)
+        widget.bind("<Leave>", self._hide_now)
+
+    def _schedule(self, _):
+        self._cancel()
+        self._id = self.widget.after(self.delay, self._show)
+
+    def _cancel(self):
+        if self._id is not None:
+            try:
+                self.widget.after_cancel(self._id)
+            except Exception:
+                pass
+            self._id = None
+
+    def _show(self):
+        if self.tip or not self.widget.winfo_exists():
+            return
+        text = self.text_func()
+        if not text:
+            return
+        try:
+            x, y, cx, cy = (
+                self.widget.bbox("insert")
+                if hasattr(self.widget, "bbox")
+                else (0, 0, 0, 0)
+            )
+        except Exception:
+            x, y, cx, cy = 0, 0, 0, 0
+        x += self.widget.winfo_rootx() + 20
+        y += self.widget.winfo_rooty() + cy + 20
+        self.tip = tk.Toplevel(self.widget)
+        self.tip.wm_overrideredirect(True)
+        self.tip.wm_geometry(f"+{x}+{y}")
+        # White background tooltip with simple border
+        frame = tk.Frame(self.tip, bg="#ffffff", bd=1, relief="solid")
+        frame.pack(fill="both", expand=True)
+        lbl = tk.Label(
+            frame, text=text, bg="#ffffff", fg="#000000", font=("Segoe UI", 9)
+        )
+        lbl.pack(padx=4, pady=2)
+
+    def _hide_now(self, _):
+        self._cancel()
+        if self.tip:
+            try:
+                self.tip.destroy()
+            except Exception:
+                pass
+            self.tip = None
 
 
 class CoinScanApp(tk.Tk):
@@ -198,7 +249,10 @@ class CoinScanApp(tk.Tk):
             self.logo_label.pack(side="left", padx=(0, 0))
         else:
             self.logo_label = tk.Label(
-                self.top_bar, text="PROSEGUR", font=("Segoe UI", 14, "bold"), bg=COLORS["topbar_bg"]
+                self.top_bar,
+                text="PROSEGUR",
+                font=("Segoe UI", 14, "bold"),
+                bg=COLORS["topbar_bg"],
             )
             self.logo_label.pack(side="left", padx=(8, 0))
 
@@ -321,7 +375,9 @@ class CoinScanApp(tk.Tk):
 
         # Label that will display webcam frames (image updates done by webcam_stream)
         # Set background to corporate yellow (was black) for live scan area
-        self.webcam_label = tk.Label(self.webcam_panel, bg=COLORS["background"], fg="#000000")
+        self.webcam_label = tk.Label(
+            self.webcam_panel, bg=COLORS["background"], fg="#000000"
+        )
         self.webcam_label.pack(pady=10)
 
         # Listbox to show detection / recognition events
@@ -440,6 +496,26 @@ class CoinScanApp(tk.Tk):
 
         # Initialize which size button appears selected AFTER results_panel exists
         self.set_size(self.current_size)
+
+        # Attach tooltips (after widgets creation)
+        def tt(key):
+            # Safe access when 'tooltips' dict may not exist in LANGUAGES entries
+            return lambda: LANGUAGES[self.current_lang].get("tooltips", {}).get(key, "")
+
+        Tooltip(self.scan_btn, tt("scan_btn"))
+        Tooltip(self.size_btn_small, tt("size_small"))
+        Tooltip(self.contrast_btn, tt("contrast"))
+        # Language flag buttons: need references -> find last two children of topbar_controls
+        for child, k in zip(
+            topbar_controls.winfo_children()[:2], ["flag_de", "flag_en"]
+        ):
+            Tooltip(child, tt(k))
+        Tooltip(self.sidebar_buttons[0], tt("home"))
+        Tooltip(self.sidebar_buttons[1], tt("settings"))
+        Tooltip(self.sidebar_buttons[2], tt("about"))
+        Tooltip(self.sidebar_buttons[3], tt("exit"))
+        Tooltip(self.webcam_label, tt("webcam"))
+        Tooltip(self.results_panel, tt("results_panel"))
 
     def _on_main_content_resize(self, event):
         # Skip when in high-contrast mode or minimized sizes
@@ -588,7 +664,9 @@ class CoinScanApp(tk.Tk):
         self.title_label.config(bg=COLORS["topbar_bg"], fg="#000000")
         if hasattr(self, "logo_label"):
             self.logo_label.config(bg=COLORS["topbar_bg"])
-        self.contrast_btn.config(bg=COLORS["topbar_bg"], fg="#000000", text=contrast_icon)
+        self.contrast_btn.config(
+            bg=COLORS["topbar_bg"], fg="#000000", text=contrast_icon
+        )
         self.sidebar.config(bg=sidebar_bg)
         for btn in self.sidebar_buttons:
             btn.config(bg=sidebar_bg, fg=sidebar_fg)
@@ -610,10 +688,15 @@ class CoinScanApp(tk.Tk):
         # Footer respects corporate colors in normal mode, contrast palette in high-contrast
         if self.high_contrast:
             self.footer.config(bg=COLORS["contrast_panel_bg"])
-            self.footer_label.config(bg=COLORS["contrast_panel_bg"], fg=COLORS["contrast_fg"])
+            self.footer_label.config(
+                bg=COLORS["contrast_panel_bg"], fg=COLORS["contrast_fg"]
+            )
         else:
+            # Fix: use footer_bg as background (was incorrectly using footer_fg)
             self.footer.config(bg=COLORS["footer_bg"])  # Yellow background
-            self.footer_label.config(bg=COLORS["footer_bg"], fg=COLORS["footer_fg"])  # Black text
+            self.footer_label.config(
+                bg=COLORS["footer_bg"], fg=COLORS["footer_fg"]
+            )  # Black text
 
         # Background image visibility according to contrast mode
         if hasattr(self, "bg_label"):
