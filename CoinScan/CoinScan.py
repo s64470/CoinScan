@@ -18,6 +18,7 @@ from ui_config import (
 
 VERSION = "1.0.0"
 
+
 def get_flag_img(path):
     """
     Load and return a Tk-compatible PhotoImage for a flag icon.
@@ -81,7 +82,7 @@ def generate_prosegur_globe_bg(width: int, height: int) -> Image.Image:
     """
     Generate a corporate-style Prosegur background with exactly ONE globe watermark:
     - Base corporate yellow (#FFD100).
-    - Single faded globe (centered) with latitude/longitude lines.
+    - Single faded globe positioned at the bottom-right corner (acts as a subtle watermark).
     """
     bg_color = COLORS.get("background", "#FFD100")
     width = max(64, int(width))
@@ -116,13 +117,42 @@ def generate_prosegur_globe_bg(width: int, height: int) -> Image.Image:
         # Equator emphasized
         draw.line([(cx - radius, cy), (cx + radius, cy)], fill=stroke, width=2)
 
-    # Single centered globe watermark
+    # Single globe watermark placed bottom-right
     globe_radius = int(min(width, height) * 0.32)
-    draw_globe(width // 2, height // 2, globe_radius)
+    margin = max(12, globe_radius // 5)  # padding from edges
+    cx = width - globe_radius - margin
+    cy = height - globe_radius - margin
+    # Ensure still inside canvas (very small sizes fallback to center)
+    if cx - globe_radius < 0 or cy - globe_radius < 0:
+        cx, cy = width // 2, height // 2
+    draw_globe(cx, cy, globe_radius)
 
     base = base.convert("RGBA")
     base.alpha_composite(overlay)
     return base.convert("RGB")
+
+
+def generate_globe_icon(diameter: int = 40) -> Image.Image:
+    """Generate a standalone globe icon (transparent background) for footer use."""
+    diameter = max(16, int(diameter))
+    img = Image.new("RGBA", (diameter, diameter), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    radius = diameter // 2 - 2
+    cx = cy = diameter // 2
+    stroke = (0, 0, 0, 180)
+    # Outer circle
+    draw.ellipse((cx - radius, cy - radius, cx + radius, cy + radius), outline=stroke, width=3)
+    # Longitudes
+    for offset in (-0.45, 0, 0.45):
+        ox = int(radius * offset)
+        draw.ellipse((cx - ox - radius, cy - radius, cx - ox + radius, cy + radius), outline=stroke, width=1)
+    # Latitudes
+    for frac in (-0.5, 0, 0.5):
+        ry = int(radius * (0.65 + 0.25 * frac))
+        draw.ellipse((cx - radius, cy - ry, cx + radius, cy + ry), outline=stroke, width=1)
+    # Equator
+    draw.line([(cx - radius, cy), (cx + radius, cy)], fill=stroke, width=2)
+    return img
 
 
 class Tooltip:
@@ -200,6 +230,7 @@ class CoinScanApp(tk.Tk):
         super().__init__()
 
         # UI state
+        # TODO: Translate to German
         self.current_lang = "en"  # active language key from language.LANGUAGES
         self.current_size = SIZES["webcam_small"]  # default webcam capture size (Small)
         self.high_contrast = False  # accessibility toggle
@@ -287,7 +318,7 @@ class CoinScanApp(tk.Tk):
         ).pack(side="left", padx=2)
 
         # Spacer between language and contrast button
-        tk.Frame(topbar_controls, width=16, bg=COLORS["topbar_bg"]).pack(side="left")
+        tk.Frame(topbar_controls, width=32, bg=COLORS["topbar_bg"]).pack(side="left")
 
         # Contrast toggle button (text updated by apply_contrast)
         self.contrast_btn = tk.Button(
@@ -368,8 +399,15 @@ class CoinScanApp(tk.Tk):
         )
 
         # Webcam panel (left side of main content)
+        # Make it visually transparent with a visible border
         self.webcam_panel = tk.Frame(
-            self.main_content, bg=COLORS["panel_bg"], bd=2, relief="groove"
+            self.main_content,
+            bg=COLORS["background"],
+            bd=0,
+            relief="flat",
+            highlightthickness=2,
+            highlightbackground="#000000",
+            highlightcolor="#000000",
         )
         self.webcam_panel.pack(side="left", padx=40, pady=40, fill="both", expand=True)
 
@@ -403,10 +441,10 @@ class CoinScanApp(tk.Tk):
         self.scan_btn.pack(pady=10)
 
         # Size selection (only one option now)
-        size_frame = tk.Frame(self.webcam_panel, bg=COLORS["panel_bg"])
-        size_frame.pack(pady=5)
+        self.size_frame = tk.Frame(self.webcam_panel, bg=COLORS["background"])  # transparent look
+        self.size_frame.pack(pady=5)
         self.size_btn_small = tk.Button(
-            size_frame,
+            self.size_frame,
             text="480x360",
             font=FONTS["size_button"],
             bg=COLORS["button_bg"],
@@ -422,16 +460,17 @@ class CoinScanApp(tk.Tk):
         self.size_btn_small.pack(side="left", padx=5)
 
         # Global font size controls (A- / A+)
-        font_frame = tk.Frame(self.webcam_panel, bg=COLORS["panel_bg"])
-        font_frame.pack(pady=(0, 10))
-        tk.Label(
-            font_frame,
+        self.font_frame = tk.Frame(self.webcam_panel, bg=COLORS["background"])  # transparent look
+        self.font_frame.pack(pady=(0, 10))
+        self.fontsize_label = tk.Label(
+            self.font_frame,
             text="Font size:",
-            bg=COLORS["panel_bg"],
+            bg=COLORS["background"],
             font=FONTS["button"],
-        ).pack(side="left", padx=(0, 8))
+        )
+        self.fontsize_label.pack(side="left", padx=(0, 8))
         tk.Button(
-            font_frame,
+            self.font_frame,
             text="A-",
             font=FONTS["button"],
             bg=COLORS["button_bg"],
@@ -444,7 +483,7 @@ class CoinScanApp(tk.Tk):
             command=lambda: self.adjust_font_size(-1),
         ).pack(side="left", padx=4)
         tk.Button(
-            font_frame,
+            self.font_frame,
             text="A+",
             font=FONTS["button"],
             bg=COLORS["button_bg"],
@@ -458,8 +497,15 @@ class CoinScanApp(tk.Tk):
         ).pack(side="left", padx=4)
 
         # Results panel (right side of main content)
+        # Make it follow main background but WITH a visible border
         self.results_panel = tk.Frame(
-            self.main_content, bg=COLORS["topbar_bg"], bd=2, relief="ridge"
+            self.main_content,
+            bg=COLORS["background"],
+            bd=0,
+            relief="flat",
+            highlightthickness=2,
+            highlightbackground="#000000",
+            highlightcolor="#000000",
         )
         self.results_panel.pack(side="right", padx=40, pady=40, fill="y")
 
@@ -480,9 +526,24 @@ class CoinScanApp(tk.Tk):
 
         # Footer (left-aligned copyright)
         self.footer = tk.Frame(
-            self, bg=COLORS["footer_bg"], height=SIZES["footer_height"]
+            self, bg=COLORS["footer_bg"]  # remove fixed height to allow globe above
         )
         self.footer.pack(side="bottom", fill="x")
+
+        # Globe icon above copyright label
+        try:
+            globe_img = generate_globe_icon(64)
+            self.footer_globe_photo = ImageTk.PhotoImage(globe_img)
+            self.footer_globe_label = tk.Label(
+                self.footer,
+                image=self.footer_globe_photo,
+                bg=COLORS["footer_bg"],
+            )
+            # Position at bottom-right with padding
+            self.footer_globe_label.place(relx=1.0, rely=1.0, anchor="se", x=-16, y=-4)
+        except Exception:
+            self.footer_globe_label = None
+
         self.footer_label = tk.Label(
             self.footer,
             text="© 2025 Prosegur Cash Services Germany GmbH. All rights reserved.",
@@ -492,7 +553,7 @@ class CoinScanApp(tk.Tk):
             anchor="w",
             justify="left",
         )
-        self.footer_label.pack(padx=16, pady=8, side="left")
+        self.footer_label.pack(padx=16, pady=(0, 4), anchor="w")
 
         # Initialize which size button appears selected AFTER results_panel exists
         self.set_size(self.current_size)
@@ -626,11 +687,7 @@ class CoinScanApp(tk.Tk):
         self.contrast_btn.config(font=FONTS["button"])
 
     def apply_contrast(self):
-        """
-        Apply color scheme based on the high_contrast flag.
-
-        This swaps colors from ui_config.COLORS to high-contrast variants when needed.
-        """
+        """Apply color scheme; ensure results_label and total_label use yellow in normal mode."""
         if self.high_contrast:
             bg_main = COLORS["contrast_bg"]
             fg_main = COLORS["contrast_fg"]
@@ -643,6 +700,7 @@ class CoinScanApp(tk.Tk):
             sidebar_bg = COLORS["contrast_sidebar_bg"]
             sidebar_fg = COLORS["contrast_sidebar_fg"]
             contrast_icon = CONTRAST_ICONS["contrast"]
+            border_color = COLORS["contrast_fg"]
         else:
             bg_main = COLORS["background"]
             fg_main = "#000000"
@@ -655,55 +713,68 @@ class CoinScanApp(tk.Tk):
             sidebar_bg = COLORS["sidebar_bg"]
             sidebar_fg = COLORS["sidebar_fg"]
             contrast_icon = CONTRAST_ICONS["normal"]
+            border_color = "#000000"
 
         # Apply window and widgets colors consistently
         self.configure(bg=bg_main)
-        # Keep entire top bar (logo + title + controls) corporate yellow
         if hasattr(self, "top_bar"):
             self.top_bar.config(bg=COLORS["topbar_bg"])
         self.title_label.config(bg=COLORS["topbar_bg"], fg="#000000")
         if hasattr(self, "logo_label"):
             self.logo_label.config(bg=COLORS["topbar_bg"])
-        self.contrast_btn.config(
-            bg=COLORS["topbar_bg"], fg="#000000", text=contrast_icon
-        )
+        self.contrast_btn.config(bg=COLORS["topbar_bg"], fg="#000000", text=contrast_icon)
         self.sidebar.config(bg=sidebar_bg)
         for btn in self.sidebar_buttons:
             btn.config(bg=sidebar_bg, fg=sidebar_fg)
-        self.webcam_panel.config(bg=bg_panel)
+        self.webcam_panel.config(
+            bg=bg_main,
+            bd=0,
+            relief="flat",
+            highlightthickness=2,
+            highlightbackground=border_color,
+            highlightcolor=border_color,
+        )
+        if hasattr(self, "size_frame"):
+            self.size_frame.config(bg=bg_main)
+        if hasattr(self, "font_frame"):
+            self.font_frame.config(bg=bg_main)
+        if hasattr(self, "fontsize_label"):
+            self.fontsize_label.config(bg=bg_main)
+        if hasattr(self, "webcam_label"):
+            self.webcam_label.config(bg=bg_main)
         if hasattr(self, "logo_label"):
-            # Keep logo area on corporate yellow even in contrast mode
             self.logo_label.config(bg=COLORS["topbar_bg"])
         self.recognition_list.config(bg=entry_bg, fg=entry_fg)
-        self.scan_btn.config(
-            bg=btn_bg, fg=btn_fg, activebackground=btn_bg, activeforeground=btn_fg
-        )
-        self.size_btn_small.config(
-            bg=btn_bg, fg=btn_fg, activebackground=btn_bg, activeforeground=btn_fg
-        )
-        self.results_panel.config(bg=bg_panel)
-        self.results_label.config(bg=bg_panel, fg=fg_panel)
-        self.total_label.config(bg=bg_panel, fg=fg_panel)
-
-        # Footer respects corporate colors in normal mode, contrast palette in high-contrast
+        self.scan_btn.config(bg=btn_bg, fg=btn_fg, activebackground=btn_bg, activeforeground=btn_fg)
+        self.size_btn_small.config(bg=btn_bg, fg=btn_fg, activebackground=btn_bg, activeforeground=btn_fg)
+        # Results panel: transparent background with visible border
+        self.results_panel.config(bg=bg_main, bd=0, relief="flat", highlightthickness=2, highlightbackground=border_color, highlightcolor=border_color)
+        # Keep labels yellow in normal mode
+        if self.high_contrast:
+            self.results_label.config(bg=bg_panel, fg=fg_panel)
+            self.total_label.config(bg=bg_panel, fg=fg_panel)
+        else:
+            self.results_label.config(bg=COLORS["background"], fg=fg_panel)
+            self.total_label.config(bg=COLORS["background"], fg=fg_panel)
         if self.high_contrast:
             self.footer.config(bg=COLORS["contrast_panel_bg"])
-            self.footer_label.config(
-                bg=COLORS["contrast_panel_bg"], fg=COLORS["contrast_fg"]
-            )
+            if hasattr(self, "footer_globe_label") and self.footer_globe_label:
+                self.footer_globe_label.config(bg=COLORS["contrast_panel_bg"], image="")
+            self.footer_label.config(bg=COLORS["contrast_panel_bg"], fg=COLORS["contrast_fg"])
         else:
-            # Fix: use footer_bg as background (was incorrectly using footer_fg)
             self.footer.config(bg=COLORS["footer_bg"])  # Yellow background
-            self.footer_label.config(
-                bg=COLORS["footer_bg"], fg=COLORS["footer_fg"]
-            )  # Black text
-
-        # Background image visibility according to contrast mode
+            if hasattr(self, "footer_globe_label") and self.footer_globe_label:
+                try:
+                    globe_img = generate_globe_icon(64)
+                    self.footer_globe_photo = ImageTk.PhotoImage(globe_img)
+                    self.footer_globe_label.config(bg=COLORS["footer_bg"], image=self.footer_globe_photo)
+                except Exception:
+                    self.footer_globe_label.config(image="")
+            self.footer_label.config(bg=COLORS["footer_bg"], fg=COLORS["footer_fg"])  # Black text
         if hasattr(self, "bg_label"):
             if self.high_contrast:
                 self.bg_label.config(image="")
             else:
-                # regenerate for current size
                 w = max(2, self.main_content.winfo_width())
                 h = max(2, self.main_content.winfo_height())
                 self._render_background_image(w, h)

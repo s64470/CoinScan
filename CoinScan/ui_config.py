@@ -5,7 +5,8 @@ COLORS = {
     "panel_bg": "white",
     "sidebar_bg": "#2c3e50",
     "sidebar_fg": "white",
-    "topbar_bg": "#FFD100",
+    # Slightly darker than background for subtle separation
+    "topbar_bg": "#F5C800",
     "button_bg": "#3498db",
     "button_fg": "white",
     "button_active_bg": "#2980b9",
