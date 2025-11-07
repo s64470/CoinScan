@@ -790,17 +790,23 @@ class CoinScanApp(tk.Tk):
             self.footer.config(bg=COLORS["contrast_panel_bg"])
             if hasattr(self, "footer_globe_label") and self.footer_globe_label:
                 self.footer_globe_label.config(bg=COLORS["contrast_panel_bg"], image="")
-            self.footer_label.config(bg=COLORS["contrast_panel_bg"], fg=COLORS["contrast_fg"])
+            self.footer_label.config(
+                bg=COLORS["contrast_panel_bg"], fg=COLORS["contrast_fg"]
+            )
         else:
             self.footer.config(bg=COLORS["footer_bg"])  # Yellow background
             if hasattr(self, "footer_globe_label") and self.footer_globe_label:
                 try:
                     globe_img = generate_globe_icon(64)
                     self.footer_globe_photo = ImageTk.PhotoImage(globe_img)
-                    self.footer_globe_label.config(bg=COLORS["footer_bg"], image=self.footer_globe_photo)
+                    self.footer_globe_label.config(
+                        bg=COLORS["footer_bg"], image=self.footer_globe_photo
+                    )
                 except Exception:
                     self.footer_globe_label.config(image="")
-            self.footer_label.config(bg=COLORS["footer_bg"], fg=COLORS["footer_fg"])  # Black text
+            self.footer_label.config(
+                bg=COLORS["footer_bg"], fg=COLORS["footer_fg"]
+            )  # Black text
         if hasattr(self, "bg_label"):
             if self.high_contrast:
                 self.bg_label.config(image="")

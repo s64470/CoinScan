@@ -171,8 +171,8 @@ def update_recognition(
                     else:
                         colour_label = "Silver"
 
-                    # Map colour and radius to a euro coin value and label.
-                    # These radius thresholds are heuristics and should be calibrated for your camera.
+                    # Heuristic denomination mapping (pixel radii need calibration per camera):
+                    # Order matters: check larger coins first.
                     if colour_label == "Gold" and r > 52:
                         value = 2.00
                         label = "2€"
@@ -185,11 +185,20 @@ def update_recognition(
                     elif colour_label == "Gold" and r > 27:
                         value = 0.20
                         label = "20ct"
-                    elif colour_label == "Copper" and r > 22:
+                    elif colour_label == "Gold" and r > 22:
                         value = 0.10
                         label = "10ct"
-                    else:
+                    elif colour_label == "Copper" and r > 21:
                         value = 0.05
+                        label = "5ct"
+                    elif colour_label == "Copper" and r > 18:
+                        value = 0.02
+                        label = "2ct"
+                    elif colour_label == "Copper" and r > 15:
+                        value = 0.01
+                        label = "1ct"
+                    else:
+                        value = 0.00
                         label = "Unknown"
                     toc("classify")
 
