@@ -33,7 +33,7 @@ def update_recognition(
       current_size: tuple(width, height) used to set webcam resolution and resize image.
       current_lang: "de" for German messages, any other value for English.
     """
-    # Disable scan button to prevent concurrent scans
+    # Disable scan button to prevent concurrent scans (main thread)
     scan_button.config(state="disabled")
 
     def stream():
@@ -44,6 +44,23 @@ def update_recognition(
 
         def toc(name: str):
             times[name] += time.perf_counter()
+
+        # Helper to marshal UI updates back to the Tk main thread
+        def ui(callable_obj, *args, **kwargs):
+            try:
+                recognition.after(0, lambda: callable_obj(*args, **kwargs))
+            except Exception:
+                # If widget is destroyed, ignore UI updates
+                pass
+
+        # Special helper to set the webcam image on the main thread
+        def set_webcam_image(pil_img: Image.Image):
+            try:
+                imgtk = ImageTk.PhotoImage(image=pil_img)
+                webcam_label.imgtk = imgtk  # keep reference
+                webcam_label.configure(image=imgtk)
+            except Exception:
+                pass
 
         cap = None
         try:
@@ -59,7 +76,7 @@ def update_recognition(
 
             if not cap.isOpened():
                 # If webcam couldn't be opened, re-enable button and exit.
-                recognition.insert("end", "Perf: camera_open_failed")
+                ui(recognition.insert, "end", "Perf: camera_open_failed")
                 return
 
             # Grab a single frame from the camera
@@ -68,7 +85,7 @@ def update_recognition(
             toc("read")
             if not ret:
                 # If frame capture failed, release camera, re-enable button and exit.
-                recognition.insert("end", "Perf: frame_read_failed")
+                ui(recognition.insert, "end", "Perf: frame_read_failed")
                 return
 
             # Convert to grayscale and apply median blur to reduce noise prior to circle detection.
@@ -95,7 +112,7 @@ def update_recognition(
             toc("hough")
 
             # Prepare UI output variables
-            recognition.delete(0, "end")  # Clear previous recognition results
+            ui(recognition.delete, 0, "end")  # Clear previous recognition results
             found = False
             total = 0.0
 
@@ -154,8 +171,8 @@ def update_recognition(
                     else:
                         colour_label = "Silver"
 
-                    # Map colour and radius to a euro coin value and label.
-                    # These radius thresholds are heuristics and should be calibrated for your camera.
+                    # Heuristic denomination mapping (pixel radii need calibration per camera):
+                    # Order matters: check larger coins first.
                     if colour_label == "Gold" and r > 52:
                         value = 2.00
                         label = "2€"
@@ -168,17 +185,27 @@ def update_recognition(
                     elif colour_label == "Gold" and r > 27:
                         value = 0.20
                         label = "20ct"
-                    elif colour_label == "Copper" and r > 22:
+                    elif colour_label == "Gold" and r > 22:
                         value = 0.10
                         label = "10ct"
-                    else:
+                    elif colour_label == "Copper" and r > 21:
                         value = 0.05
+                        label = "5ct"
+                    elif colour_label == "Copper" and r > 18:
+                        value = 0.02
+                        label = "2ct"
+                    elif colour_label == "Copper" and r > 15:
+                        value = 0.01
+                        label = "1ct"
+                    else:
+                        value = 0.00
                         label = "Unknown"
                     toc("classify")
 
                     # Accumulate total and update recognition list widget with details.
                     total += value
-                    recognition.insert(
+                    ui(
+                        recognition.insert,
                         "end",
                         f"Coin: {label} ({colour_label}, radius: {r}, hue: {mean_hue:.1f})",
                     )
@@ -197,7 +224,7 @@ def update_recognition(
                     if current_lang == "de"
                     else "No coin detected in centre."
                 )
-                recognition.insert("end", msg)
+                ui(recognition.insert, "end", msg)
 
             # Update the total label using the selected language formatting.
             tic("update_total")
@@ -206,7 +233,7 @@ def update_recognition(
                 if current_lang == "de"
                 else f"TOTAL: €{total:.2f}"
             )
-            total_label.config(text=total_text)
+            ui(total_label.config, text=total_text)
             toc("update_total")
 
             # Convert frame to RGB, resize for the UI with OpenCV, then show via PIL/Tk.
@@ -226,15 +253,10 @@ def update_recognition(
             img = Image.fromarray(resized)
             toc("to_pil")
 
+            # Create PhotoImage and update label on main thread
             tic("photoimage")
-            imgtk = ImageTk.PhotoImage(image=img)
+            ui(set_webcam_image, img)
             toc("photoimage")
-
-            tic("label_configure")
-            # Keep a reference to the PhotoImage so it isn't garbage collected by Tk.
-            webcam_label.imgtk = imgtk
-            webcam_label.configure(image=imgtk)
-            toc("label_configure")
 
         finally:
             # Release the camera and re-enable the scan button.
@@ -245,7 +267,7 @@ def update_recognition(
                 except Exception:
                     pass
                 toc("release")
-            scan_button.config(state="normal")
+            ui(scan_button.config, state="normal")
 
             # Summarize perf metrics in ms
             if times:
@@ -275,7 +297,7 @@ def update_recognition(
                     f"{k}={times_ms[k]}ms" for k in ordered_keys if k in times_ms
                 )
                 try:
-                    recognition.insert("end", summary)
+                    ui(recognition.insert, "end", summary)
                 except Exception:
                     pass
                 print("Perf details (ms):", times_ms)

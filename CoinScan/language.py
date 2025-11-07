@@ -1,51 +1,71 @@
-﻿# language.py
-# Multilingual UI strings for CoinScan
-
-"""Multilingual UI strings for CoinScan.
-
-Structure:
-- LANGUAGES: dict mapping ISO language codes (e.g., 'en', 'de') to dictionaries of UI strings.
-- Each inner dictionary contains keys used by the UI:
-    - title: main window title or header
-    - scan: text for the scan action/button
-    - results: label for results section
-    - total: formatted total currency string (localized formatting may be applied elsewhere)
-    - about: about dialog/menu label
-    - exit_confirm: confirmation message shown when user exits
-
-Guidelines for adding languages:
-- Use the ISO language code as the top-level key (string).
-- Keep keys consistent across languages so the UI lookup is straightforward.
-- For currency/number formatting, prefer storing localized strings or use formatting at runtime.
-"""
-
-LANGUAGES = {
+﻿LANGUAGES = {
     "de": {
-        # UI header/title shown in the main window
-        "title": "LIVE SCAN",
-        # Label for the scan button; emoji is supported in most modern UIs
+        "title": "P R O S E G U R",
         "scan": "🔍 Münzen scannen",
-        # Results section label
         "results": "Ergebnisse",
-        # Localized total display — consider formatting dynamically for real values
         "total": "GESAMT: 0,00 €",
-        # About dialog/menu label
+        "total_fmt": "GESAMT: {amount} €",
         "about": "Über CoinScan",
-        # Exit confirmation message (German)
         "exit_confirm": "Möchten Sie CoinScan wirklich beenden?",
+        "tooltips": {
+            "scan_btn": "Münzen im Zentrum scannen",
+            "size_small": "Webcam-Auflösung 480x360",
+            "contrast": "Hochkontrast umschalten",
+            "flag_de": "Deutsch wählen",
+            "flag_en": "Englisch wählen",
+            "home": "Start / Ergebnisse löschen",
+            "settings": "Einstellungen öffnen",
+            "about": "Info zu CoinScan",
+            "exit": "Anwendung beenden",
+            "webcam": "Webcam-Vorschau",
+            "results_panel": "Erkannte Münzen und Gesamt",
+        },
     },
     "en": {
-        # UI header/title shown in the main window
-        "title": "LIVE SCAN",
-        # Label for the scan button; emoji is supported in most modern UIs
+        "title": "P R O S E G U R",
         "scan": "🔍 Scan Coins",
-        # Results section label
         "results": "Results",
-        # Localized total display — consider formatting dynamically for real values
         "total": "TOTAL: €0.00",
-        # About dialog/menu label
+        "total_fmt": "TOTAL: €{amount}",
         "about": "About CoinScan",
-        # Exit confirmation message (English)
         "exit_confirm": "Are you sure you want to exit CoinScan?",
+        "tooltips": {
+            "scan_btn": "Scan coins in centre",
+            "size_small": "Set webcam resolution 480x360",
+            "contrast": "Toggle high-contrast mode",
+            "flag_de": "Switch to German",
+            "flag_en": "Switch to English",
+            "home": "Home / Clear results",
+            "settings": "Open Settings",
+            "about": "About CoinScan",
+            "exit": "Exit application",
+            "webcam": "Webcam preview",
+            "results_panel": "Detected coins and totals",
+        },
     },
+}
+
+ABOUT_TEXTS = {
+    "en": (
+        "CoinScan is a desktop application designed to help users quickly identify and count Euro coins using their computer’s webcam.\n\n"
+        "Key Features:\n"
+        "- Live coin scanning and recognition via webcam\n"
+        "- Automatic detection of coin type and value\n"
+        "- Multilingual interface (English & German)\n"
+        "- High-contrast mode for improved accessibility\n"
+        "- Simple, intuitive design\n\n"
+        "How it works:\n"
+        "Place your coins in view of your webcam and click “Scan Coins.” CoinScan will detect coins in the centre of the image, classify them by colour and size, and display the total value.\n\n"
+    ),
+    "de": (
+        "CoinScan ist eine Desktop-Anwendung, mit der Sie Euro-Münzen schnell mithilfe der Webcam Ihres Computers erkennen und zählen können.\n\n"
+        "Hauptfunktionen:\n"
+        "- Live-Erkennung und -Erfassung von Münzen über die Webcam\n"
+        "- Automatische Bestimmung von Münztyp und -wert\n"
+        "- Mehrsprachige Oberfläche (Englisch & Deutsch)\n"
+        "- Hochkontrastmodus für bessere Barrierefreiheit\n"
+        "- Einfache, intuitive Bedienung\n\n"
+        "So funktioniert’s:\n"
+        "Legen Sie Ihre Münzen in den Sichtbereich der Webcam und klicken Sie auf „Münzen scannen“. CoinScan erkennt die Münzen im Bildzentrum, klassifiziert sie nach Farbe und Größe und zeigt den Gesamtwert an.\n\n"
+    ),
 }
