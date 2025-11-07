@@ -159,14 +159,6 @@ class CoinScanApp(tk.Tk):
         self.geometry(f"{SIZES['window'][0]}x{SIZES['window'][1]}")
         self.update_idletasks()  # ensure geometry() returns updated values
 
-        # Center window on screen
-        screen_width = self.winfo_screenwidth()
-        screen_height = self.winfo_screenheight()
-        size = tuple(int(dim) for dim in self.geometry().split("+")[0].split("x"))
-        x = (screen_width // 2) - (size[0] // 2)
-        y = (screen_height // 2) - (size[1] // 2)
-        self.geometry(f"{size[0]}x{size[1]}+{x}+{y}")
-
         # Visual configuration
         self.configure(bg=COLORS["background"])
         self.resizable(False, False)
@@ -194,30 +186,30 @@ class CoinScanApp(tk.Tk):
         - Footer
         """
         # Top bar
-        top_bar = tk.Frame(self, bg=COLORS["topbar_bg"], height=48)
-        top_bar.pack(side="top", fill="x")
+        self.top_bar = tk.Frame(self, bg=COLORS["topbar_bg"], height=48)
+        self.top_bar.pack(side="top", fill="x")
 
         # Logo (left side) - load Prosegur SVG/PNG or fallback
         self.logo_photo = load_logo_photo()
         if self.logo_photo is not None:
             self.logo_label = tk.Label(
-                top_bar, image=self.logo_photo, bg=COLORS["topbar_bg"]
+                self.top_bar, image=self.logo_photo, bg=COLORS["topbar_bg"]
             )
             self.logo_label.pack(side="left", padx=(0, 0))
         else:
             self.logo_label = tk.Label(
-                top_bar, text="PROSEGUR", font=("Segoe UI", 14, "bold"), bg=COLORS["topbar_bg"]
+                self.top_bar, text="PROSEGUR", font=("Segoe UI", 14, "bold"), bg=COLORS["topbar_bg"]
             )
             self.logo_label.pack(side="left", padx=(8, 0))
 
         # Title label (text set in update_language)
         self.title_label = tk.Label(
-            top_bar, font=FONTS["title"], bg=COLORS["topbar_bg"]
+            self.top_bar, font=FONTS["title"], bg=COLORS["topbar_bg"]
         )
         self.title_label.pack(side="left", padx=20)
 
         # Top bar right controls: language flags and contrast toggle
-        topbar_controls = tk.Frame(top_bar, bg=COLORS["topbar_bg"])
+        topbar_controls = tk.Frame(self.top_bar, bg=COLORS["topbar_bg"])
         topbar_controls.pack(side="right", padx=10)
 
         # Load flag images (safe loader handles missing files)
@@ -328,8 +320,8 @@ class CoinScanApp(tk.Tk):
         self.webcam_panel.pack(side="left", padx=40, pady=40, fill="both", expand=True)
 
         # Label that will display webcam frames (image updates done by webcam_stream)
-        # Keep a black background to maximize contrast for the video
-        self.webcam_label = tk.Label(self.webcam_panel, bg="black", fg="white")
+        # Set background to corporate yellow (was black) for live scan area
+        self.webcam_label = tk.Label(self.webcam_panel, bg=COLORS["background"], fg="#000000")
         self.webcam_label.pack(pady=10)
 
         # Listbox to show detection / recognition events
@@ -432,15 +424,15 @@ class CoinScanApp(tk.Tk):
 
         # Footer (left-aligned copyright)
         self.footer = tk.Frame(
-            self, bg=COLORS["topbar_bg"], height=SIZES["footer_height"]
+            self, bg=COLORS["footer_bg"], height=SIZES["footer_height"]
         )
         self.footer.pack(side="bottom", fill="x")
         self.footer_label = tk.Label(
             self.footer,
-            text="© 2025 Your Name or Organisation. All rights reserved.",
+            text="© 2025 Prosegur Cash Services Germany GmbH. All rights reserved.",
             font=FONTS["footer"],
-            bg=COLORS["topbar_bg"],
-            fg=COLORS["sidebar_bg"],
+            bg=COLORS["footer_bg"],
+            fg=COLORS["footer_fg"],
             anchor="w",
             justify="left",
         )
@@ -499,11 +491,8 @@ class CoinScanApp(tk.Tk):
             self.current_size[1] + 40 + 40 + 48 + SIZES["footer_height"],
             700,
         )
-        screen_w = self.winfo_screenwidth()
-        screen_h = self.winfo_screenheight()
-        x = max(0, (screen_w // 2) - (width // 2))
-        y = max(0, (screen_h // 2) - (height // 2))
-        self.geometry(f"{width}x{height}+{x}+{y}")
+        # Keep current window position; only update size
+        self.geometry(f"{width}x{height}")
 
     def set_size(self, size):
         """
@@ -593,15 +582,20 @@ class CoinScanApp(tk.Tk):
 
         # Apply window and widgets colors consistently
         self.configure(bg=bg_main)
-        self.title_label.config(bg=bg_panel, fg=fg_panel)
-        self.contrast_btn.config(bg=bg_panel, fg=fg_panel, text=contrast_icon)
+        # Keep entire top bar (logo + title + controls) corporate yellow
+        if hasattr(self, "top_bar"):
+            self.top_bar.config(bg=COLORS["topbar_bg"])
+        self.title_label.config(bg=COLORS["topbar_bg"], fg="#000000")
+        if hasattr(self, "logo_label"):
+            self.logo_label.config(bg=COLORS["topbar_bg"])
+        self.contrast_btn.config(bg=COLORS["topbar_bg"], fg="#000000", text=contrast_icon)
         self.sidebar.config(bg=sidebar_bg)
         for btn in self.sidebar_buttons:
             btn.config(bg=sidebar_bg, fg=sidebar_fg)
         self.webcam_panel.config(bg=bg_panel)
-
-        # Keep the webcam label black for best video contrast; text color reflects entry_fg
-        self.webcam_label.config(bg="black", fg=entry_fg)
+        if hasattr(self, "logo_label"):
+            # Keep logo area on corporate yellow even in contrast mode
+            self.logo_label.config(bg=COLORS["topbar_bg"])
         self.recognition_list.config(bg=entry_bg, fg=entry_fg)
         self.scan_btn.config(
             bg=btn_bg, fg=btn_fg, activebackground=btn_bg, activeforeground=btn_fg
@@ -612,8 +606,14 @@ class CoinScanApp(tk.Tk):
         self.results_panel.config(bg=bg_panel)
         self.results_label.config(bg=bg_panel, fg=fg_panel)
         self.total_label.config(bg=bg_panel, fg=fg_panel)
-        self.footer.config(bg=bg_panel)
-        self.footer_label.config(bg=bg_panel, fg=sidebar_bg)
+
+        # Footer respects corporate colors in normal mode, contrast palette in high-contrast
+        if self.high_contrast:
+            self.footer.config(bg=COLORS["contrast_panel_bg"])
+            self.footer_label.config(bg=COLORS["contrast_panel_bg"], fg=COLORS["contrast_fg"])
+        else:
+            self.footer.config(bg=COLORS["footer_bg"])  # Yellow background
+            self.footer_label.config(bg=COLORS["footer_bg"], fg=COLORS["footer_fg"])  # Black text
 
         # Background image visibility according to contrast mode
         if hasattr(self, "bg_label"):
