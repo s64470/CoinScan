@@ -1,4 +1,16 @@
-﻿LANGUAGES = {
+﻿"""Language resources and helpers for CoinScan.
+
+Provides localized strings and utility helpers to fetch and format
+text safely without risking KeyError exceptions in the UI layer.
+"""
+
+from __future__ import annotations
+from typing import Any, Dict
+
+# Default language code used as fallback
+DEFAULT_LANG = "en"
+
+LANGUAGES: Dict[str, Dict[str, Any]] = {
     "de": {
         "title": "P R O S E G U R",
         "scan": "🔍 Münzen scannen",
@@ -6,7 +18,12 @@
         "total": "GESAMT: 0,00 €",
         "total_fmt": "GESAMT: {amount} €",
         "about": "Über CoinScan",
+        "settings": "Einstellungen",
+        "close": "Schließen",
         "exit_confirm": "Möchten Sie CoinScan wirklich beenden?",
+        "no_coin": "Keine Münze im Zentrum erkannt.",
+        "camera_fail": "Kamera konnte nicht geöffnet werden.",
+        "frame_fail": "Bild konnte nicht gelesen werden.",
         "tooltips": {
             "scan_btn": "Münzen im Zentrum scannen",
             "size_small": "Webcam-Auflösung 480x360",
@@ -28,7 +45,12 @@
         "total": "TOTAL: €0.00",
         "total_fmt": "TOTAL: €{amount}",
         "about": "About CoinScan",
+        "settings": "Settings",
+        "close": "Close",
         "exit_confirm": "Are you sure you want to exit CoinScan?",
+        "no_coin": "No coin detected in centre.",
+        "camera_fail": "Camera open failed",
+        "frame_fail": "Frame read failed",
         "tooltips": {
             "scan_btn": "Scan coins in centre",
             "size_small": "Set webcam resolution 480x360",
@@ -45,7 +67,7 @@
     },
 }
 
-ABOUT_TEXTS = {
+ABOUT_TEXTS: Dict[str, str] = {
     "en": (
         "CoinScan is a desktop application designed to help users quickly identify and count Euro coins using their computer’s webcam.\n\n"
         "Key Features:\n"
@@ -69,3 +91,36 @@ ABOUT_TEXTS = {
         "Legen Sie Ihre Münzen in den Sichtbereich der Webcam und klicken Sie auf „Münzen scannen“. CoinScan erkennt die Münzen im Bildzentrum, klassifiziert sie nach Farbe und Größe und zeigt den Gesamtwert an.\n\n"
     ),
 }
+
+
+def normalize_lang(lang: str) -> str:
+    """Return a supported language code, falling back to DEFAULT_LANG."""
+    return lang if lang in LANGUAGES else DEFAULT_LANG
+
+
+def get_strings(lang: str) -> Dict[str, Any]:
+    """Return the full string dictionary for a language with fallback."""
+    return LANGUAGES.get(normalize_lang(lang), LANGUAGES[DEFAULT_LANG])
+
+
+def get_text(lang: str, key: str, default: str = "") -> str:
+    """Safely fetch a top-level localized string by key."""
+    return get_strings(lang).get(key, default)
+
+
+def get_tooltip(lang: str, key: str, default: str = "") -> str:
+    """Safely fetch a tooltip string by key."""
+    return get_strings(lang).get("tooltips", {}).get(key, default)
+
+
+def format_total(lang: str, amount: float) -> str:
+    """Return localized total line using 'total_fmt'.
+
+    German uses comma as decimal separator.
+    """
+    strings = get_strings(lang)
+    fmt = strings.get("total_fmt", "TOTAL: €{amount}")
+    amount_str = f"{amount:.2f}"
+    if normalize_lang(lang) == "de":
+        amount_str = amount_str.replace(".", ",")
+    return fmt.format(amount=amount_str)
