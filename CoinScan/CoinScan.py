@@ -67,46 +67,37 @@ def load_logo_photo() -> Optional[ImageTk.PhotoImage]:
 
 
 def generate_prosegur_globe_bg(width: int, height: int) -> Image.Image:
-    """Generate yellow background with single globe watermark bottom-right."""
+    """Return a plain yellow background with a larger, lighter Prosegur logo watermark.
+
+    Watermark logic:
+    - Load `icon/logo-prosegur.png` if present
+    - Scale to ~55% of the shorter side
+    - Place bottom-right with margin
+    - Apply uniform alpha (20%) for subtlety
+    Fallback: solid background.
+    """
     bg_color = COLORS.get("background", "#FFD100")
-    width = max(64, int(width))
-    height = max(64, int(height))
-    base = Image.new("RGB", (width, height), bg_color)
-    overlay = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(overlay)
+    width = max(2, int(width))
+    height = max(2, int(height))
+    base = Image.new("RGB", (width, height), bg_color).convert("RGBA")
 
-    def draw_globe(
-        cx: int, cy: int, radius: int, stroke_alpha: int = 65, stroke_width: int = 4
-    ) -> None:
-        stroke = (0, 0, 0, stroke_alpha)
-        draw.ellipse(
-            (cx - radius, cy - radius, cx + radius, cy + radius),
-            outline=stroke,
-            width=stroke_width,
-        )
-        for offset in (-0.45, 0, 0.45):
-            ox = int(radius * offset)
-            draw.ellipse(
-                (cx - ox - radius, cy - radius, cx - ox + radius, cy + radius),
-                outline=stroke,
-                width=1,
-            )
-        for frac in (-0.5, 0, 0.5):
-            ry = int(radius * (0.65 + 0.25 * frac))
-            draw.ellipse(
-                (cx - radius, cy - ry, cx + radius, cy + ry), outline=stroke, width=1
-            )
-        draw.line([(cx - radius, cy), (cx + radius, cy)], fill=stroke, width=2)
+    try:
+        logo_path = os.path.join(os.path.dirname(__file__), "icon", "logo-prosegur.png")
+        if os.path.exists(logo_path):
+            logo = Image.open(logo_path).convert("RGBA")
+            target_side = int(min(width, height) * 0.55)
+            ratio = min(target_side / logo.width, target_side / logo.height)
+            new_size = (max(1, int(logo.width * ratio)), max(1, int(logo.height * ratio)))
+            logo = logo.resize(new_size, Image.LANCZOS)
+            # Lighter (reduce opacity to 20%)
+            alpha = logo.split()[-1].point(lambda a: int(a * 0.20))
+            logo.putalpha(alpha)
+            margin = max(16, new_size[0] // 12)
+            pos = (width - new_size[0] - margin, height - new_size[1] - margin)
+            base.alpha_composite(logo, dest=pos)
+    except Exception:
+        pass
 
-    globe_radius = int(min(width, height) * 0.32)
-    margin = max(12, globe_radius // 5)
-    cx = width - globe_radius - margin
-    cy = height - globe_radius - margin
-    if cx - globe_radius < 0 or cy - globe_radius < 0:
-        cx, cy = width // 2, height // 2
-    draw_globe(cx, cy, globe_radius)
-    base = base.convert("RGBA")
-    base.alpha_composite(overlay)
     return base.convert("RGB")
 
 
