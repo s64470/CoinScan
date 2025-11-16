@@ -87,7 +87,10 @@ def generate_prosegur_globe_bg(width: int, height: int) -> Image.Image:
             logo = Image.open(logo_path).convert("RGBA")
             target_side = int(min(width, height) * 0.55)
             ratio = min(target_side / logo.width, target_side / logo.height)
-            new_size = (max(1, int(logo.width * ratio)), max(1, int(logo.height * ratio)))
+            new_size = (
+                max(1, int(logo.width * ratio)),
+                max(1, int(logo.height * ratio)),
+            )
             logo = logo.resize(new_size, Image.LANCZOS)
             # Lighter (reduce opacity to 20%)
             alpha = logo.split()[-1].point(lambda a: int(a * 0.20))
@@ -128,7 +131,9 @@ def generate_globe_icon(diameter: int = 40) -> Image.Image:
 
 
 class Tooltip:
-    def __init__(self, widget: tk.Widget, text_func: Callable[[], str], delay: int = 400) -> None:
+    def __init__(
+        self, widget: tk.Widget, text_func: Callable[[], str], delay: int = 400
+    ) -> None:
         self.widget = widget
         self.text_func = text_func
         self.delay = delay
@@ -379,7 +384,9 @@ class CoinScanApp(tk.Tk):
             font=FONTS["button"],
             bg=COLORS.get("primary_btn_bg", COLORS["button_bg"]),
             fg=COLORS["button_fg"],
-            activebackground=COLORS.get("primary_btn_hover", COLORS["button_active_bg"]),
+            activebackground=COLORS.get(
+                "primary_btn_hover", COLORS["button_active_bg"]
+            ),
             activeforeground=COLORS["button_active_fg"],
             relief="raised",
             bd=0,
@@ -407,7 +414,9 @@ class CoinScanApp(tk.Tk):
             font=FONTS["button"],
             bg=COLORS.get("primary_btn_bg", COLORS["button_bg"]),
             fg=COLORS["button_fg"],
-            activebackground=COLORS.get("primary_btn_hover", COLORS["button_active_bg"]),
+            activebackground=COLORS.get(
+                "primary_btn_hover", COLORS["button_active_bg"]
+            ),
             activeforeground=COLORS["button_active_fg"],
             bd=0,
             padx=10,
@@ -421,7 +430,9 @@ class CoinScanApp(tk.Tk):
             font=FONTS["button"],
             bg=COLORS.get("primary_btn_bg", COLORS["button_bg"]),
             fg=COLORS["button_fg"],
-            activebackground=COLORS.get("font_btn_inc_hover", COLORS["button_active_bg"]),
+            activebackground=COLORS.get(
+                "font_btn_inc_hover", COLORS["button_active_bg"]
+            ),
             activeforeground=COLORS["button_active_fg"],
             bd=0,
             padx=10,
@@ -633,17 +644,37 @@ class CoinScanApp(tk.Tk):
             disabled = size_now <= MIN_SIZE
             self.font_dec_btn.config(
                 state=("disabled" if disabled else "normal"),
-                bg=(COLORS.get("font_btn_disabled_bg") if disabled else COLORS.get("primary_btn_bg", COLORS["button_bg"])),
-                fg=(COLORS.get("font_btn_disabled_fg") if disabled else COLORS["button_fg"]),
-                activebackground=COLORS.get("primary_btn_hover", COLORS["button_active_bg"]),
+                bg=(
+                    COLORS.get("font_btn_disabled_bg")
+                    if disabled
+                    else COLORS.get("primary_btn_bg", COLORS["button_bg"])
+                ),
+                fg=(
+                    COLORS.get("font_btn_disabled_fg")
+                    if disabled
+                    else COLORS["button_fg"]
+                ),
+                activebackground=COLORS.get(
+                    "primary_btn_hover", COLORS["button_active_bg"]
+                ),
             )
         if hasattr(self, "font_inc_btn"):
             disabled = size_now >= MAX_SIZE
             self.font_inc_btn.config(
                 state=("disabled" if disabled else "normal"),
-                bg=(COLORS.get("font_btn_disabled_bg") if disabled else COLORS.get("primary_btn_bg", COLORS["button_bg"])),
-                fg=(COLORS.get("font_btn_disabled_fg") if disabled else COLORS["button_fg"]),
-                activebackground=COLORS.get("primary_btn_hover", COLORS["button_active_bg"]),
+                bg=(
+                    COLORS.get("font_btn_disabled_bg")
+                    if disabled
+                    else COLORS.get("primary_btn_bg", COLORS["button_bg"])
+                ),
+                fg=(
+                    COLORS.get("font_btn_disabled_fg")
+                    if disabled
+                    else COLORS["button_fg"]
+                ),
+                activebackground=COLORS.get(
+                    "primary_btn_hover", COLORS["button_active_bg"]
+                ),
             )
 
     def apply_contrast(self) -> None:

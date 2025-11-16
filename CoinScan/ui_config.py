@@ -22,13 +22,13 @@ COLORS = {
     "contrast_sidebar_bg": "#000000",
     "contrast_sidebar_fg": "#FFFF00",
     # Added user-friendly button palette
-    "primary_btn_bg": "#0057B7",            # vivid accessible blue
+    "primary_btn_bg": "#0057B7",  # vivid accessible blue
     "primary_btn_hover": "#004C9F",
-    "font_btn_inc_bg": "#2ecc71",           # green for increase
+    "font_btn_inc_bg": "#2ecc71",  # green for increase
     "font_btn_inc_hover": "#27ae60",
-    "font_btn_dec_bg": "#e67e22",           # orange for decrease
+    "font_btn_dec_bg": "#e67e22",  # orange for decrease
     "font_btn_dec_hover": "#d35400",
-    "font_btn_disabled_bg": "#b0b0b0",      # neutral disabled state
+    "font_btn_disabled_bg": "#b0b0b0",  # neutral disabled state
     "font_btn_disabled_fg": "#666666",
 }
 
