@@ -24,6 +24,7 @@
   <ItemGroup>
     <Compile Include="CoinScan.py" />
     <Compile Include="language.py" />
+    <Compile Include="settings_manager.py" />
     <Compile Include="ui_config.py" />
     <Compile Include="webcam_stream.py" />
   </ItemGroup>
@@ -32,7 +33,6 @@
     <Content Include="icon\help_icon.png" />
     <Content Include="icon\flag_DE.png" />
     <Content Include="icon\flag_UK.png" />
-    <Content Include="icon\logo.png" />
     <Content Include="icon\logo-prosegur.png" />
     <Content Include="requirements.txt" />
   </ItemGroup>

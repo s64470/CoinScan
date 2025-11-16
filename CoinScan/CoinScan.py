@@ -3,8 +3,8 @@ import tkinter as tk
 import tkinter.messagebox as messagebox
 from PIL import Image, ImageTk, ImageDraw
 from typing import Optional, Callable, Tuple
+from settings_manager import load_settings, save_settings, DEFAULT_SETTINGS
 
-# Import recognition entry point and UI resources
 from webcam_stream import update_recognition
 from language import LANGUAGES, ABOUT_TEXTS
 from ui_config import (
@@ -19,35 +19,38 @@ from ui_config import (
 VERSION = "1.0.0"
 
 
+# Load a flag image from disk and return a Tk PhotoImage (fallback to grey box).
 def get_flag_img(path: str) -> ImageTk.PhotoImage:
-    """Load and return a Tk-compatible PhotoImage for a flag icon.
-
-    Builds an absolute path relative to this script. Returns a placeholder
-    grey image if loading fails.
-    """
     base = os.path.dirname(__file__)
     full_path = os.path.join(base, path)
     try:
-        # Use high-quality resizing for clarity
-        img = Image.open(full_path).resize(SIZES["flag"], Image.LANCZOS)
+        with Image.open(full_path) as img:
+            img = img.convert("RGBA").resize(SIZES["flag"], Image.LANCZOS)
+            return ImageTk.PhotoImage(img.copy())
+    except (FileNotFoundError, OSError):
+        img = Image.new("RGBA", SIZES["flag"], "grey")
+        return ImageTk.PhotoImage(img)
     except Exception:
-        img = Image.new("RGB", SIZES["flag"], "grey")  # fallback
-    return ImageTk.PhotoImage(img)
+        img = Image.new("RGBA", SIZES["flag"], "grey")
+        return ImageTk.PhotoImage(img)
 
 
+# Load application logo if present, otherwise draw a simple fallback logo.
 def load_logo_photo() -> Optional[ImageTk.PhotoImage]:
-    """Attempt to load logo image; generate placeholder if missing."""
     base = os.path.dirname(__file__)
     size = (SIZES["logo_width"], SIZES["logo_width"])
     png_path = os.path.join(base, "icon", "logo-prosegur.png")
     if os.path.exists(png_path):
         try:
-            img = Image.open(png_path).convert("RGBA").resize(size, Image.LANCZOS)
-            return ImageTk.PhotoImage(img)
+            with Image.open(png_path) as img:
+                img = img.convert("RGBA").resize(size, Image.LANCZOS)
+                return ImageTk.PhotoImage(img.copy())
+        except (OSError, FileNotFoundError):
+            pass
         except Exception:
             pass
-    # Placeholder
     try:
+        # Draw a simple circular fallback logo
         img = Image.new("RGBA", size, (0, 0, 0, 0))
         d = ImageDraw.Draw(img)
         r = size[0] // 2 - 2
@@ -66,44 +69,39 @@ def load_logo_photo() -> Optional[ImageTk.PhotoImage]:
         return None
 
 
+# Generate a background image with a faint logo composited in the corner.
 def generate_prosegur_globe_bg(width: int, height: int) -> Image.Image:
-    """Return a plain yellow background with a larger, lighter Prosegur logo watermark.
-
-    Watermark logic:
-    - Load `icon/logo-prosegur.png` if present
-    - Scale to ~55% of the shorter side
-    - Place bottom-right with margin
-    - Apply uniform alpha (20%) for subtlety
-    Fallback: solid background.
-    """
     bg_color = COLORS.get("background", "#FFD100")
     width = max(2, int(width))
     height = max(2, int(height))
     base = Image.new("RGB", (width, height), bg_color).convert("RGBA")
 
+    logo_path = os.path.join(os.path.dirname(__file__), "icon", "logo-prosegur.png")
     try:
-        logo_path = os.path.join(os.path.dirname(__file__), "icon", "logo-prosegur.png")
         if os.path.exists(logo_path):
-            logo = Image.open(logo_path).convert("RGBA")
-            target_side = int(min(width, height) * 0.55)
-            ratio = min(target_side / logo.width, target_side / logo.height)
-            new_size = (
-                max(1, int(logo.width * ratio)),
-                max(1, int(logo.height * ratio)),
-            )
-            logo = logo.resize(new_size, Image.LANCZOS)
-            # Lighter (reduce opacity to 20%)
-            alpha = logo.split()[-1].point(lambda a: int(a * 0.20))
-            logo.putalpha(alpha)
-            margin = max(16, new_size[0] // 12)
-            pos = (width - new_size[0] - margin, height - new_size[1] - margin)
-            base.alpha_composite(logo, dest=pos)
+            with Image.open(logo_path) as logo:
+                logo = logo.convert("RGBA")
+                target_side = int(min(width, height) * 0.55)
+                ratio = min(target_side / logo.width, target_side / logo.height)
+                new_size = (
+                    max(1, int(logo.width * ratio)),
+                    max(1, int(logo.height * ratio)),
+                )
+                logo_resized = logo.resize(new_size, Image.LANCZOS).copy()
+                alpha = logo_resized.split()[-1].point(lambda a: int(a * 0.20))
+                logo_resized.putalpha(alpha)
+                margin = max(16, new_size[0] // 12)
+                pos = (width - new_size[0] - margin, height - new_size[1] - margin)
+                base.alpha_composite(logo_resized, dest=pos)
+    except (OSError, FileNotFoundError):
+        pass
     except Exception:
         pass
 
     return base.convert("RGB")
 
 
+# Draw a small globe icon used in the footer.
 def generate_globe_icon(diameter: int = 40) -> Image.Image:
     diameter = max(16, int(diameter))
     img = Image.new("RGBA", (diameter, diameter), (0, 0, 0, 0))
@@ -114,6 +112,7 @@ def generate_globe_icon(diameter: int = 40) -> Image.Image:
     draw.ellipse(
         (cx - radius, cy - radius, cx + radius, cy + radius), outline=stroke, width=3
     )
+    # Draw globe longitude lines
     for offset in (-0.45, 0, 0.45):
         ox = int(radius * offset)
         draw.ellipse(
@@ -121,6 +120,7 @@ def generate_globe_icon(diameter: int = 40) -> Image.Image:
             outline=stroke,
             width=1,
         )
+    # Draw globe latitude lines
     for frac in (-0.5, 0, 0.5):
         ry = int(radius * (0.65 + 0.25 * frac))
         draw.ellipse(
@@ -130,10 +130,12 @@ def generate_globe_icon(diameter: int = 40) -> Image.Image:
     return img
 
 
+# Simple tooltip helper for widgets.
 class Tooltip:
     def __init__(
         self, widget: tk.Widget, text_func: Callable[[], str], delay: int = 400
     ) -> None:
+        # Save state and bind enter/leave events.
         self.widget = widget
         self.text_func = text_func
         self.delay = delay
@@ -142,10 +144,12 @@ class Tooltip:
         widget.bind("<Enter>", self._schedule)
         widget.bind("<Leave>", self._hide_now)
 
+    # Schedule tooltip display after delay.
     def _schedule(self, _event: tk.Event) -> None:
         self._cancel()
         self._id = self.widget.after(self.delay, self._show)
 
+    # Cancel a scheduled tooltip show.
     def _cancel(self) -> None:
         if self._id is not None:
             try:
@@ -154,6 +158,7 @@ class Tooltip:
                 pass
             self._id = None
 
+    # Create and show the tooltip window.
     def _show(self) -> None:
         if self.tip or not self.widget.winfo_exists():
             return
@@ -179,6 +184,7 @@ class Tooltip:
             frame, text=text, bg="#ffffff", fg="#000000", font=("Segoe UI", 9)
         ).pack(padx=4, pady=2)
 
+    # Hide and destroy the tooltip immediately.
     def _hide_now(self, _event: tk.Event) -> None:
         self._cancel()
         if self.tip:
@@ -189,22 +195,24 @@ class Tooltip:
             self.tip = None
 
 
-class CoinScanApp(tk.Tk):
-    """
-    Main application window.
+_InternalTooltip = Tooltip
 
-    Responsibilities:
-    - Build and layout all UI widgets
-    - Apply theme / contrast and font adjustments
-    - Route user actions to backend functions (start_recognition -> webcam_stream.update_recognition)
-    """
+
+# Main application window.
+class CoinScanApp(tk.Tk):
 
     def __init__(self) -> None:
         super().__init__()
-        self.current_lang: str = "en"
-        self.current_size: Tuple[int, int] = SIZES["webcam_small"]
-        self.high_contrast: bool = False
-        self.fullscreen: bool = False
+        # Load and apply saved settings.
+        self.settings = load_settings()
+        self.current_lang = self.settings.get("language", "en")
+        webcam_size_key = f"webcam_{self.settings.get('webcam_size', 'small')}"
+        self.current_size = SIZES.get(webcam_size_key, SIZES["webcam_small"])
+        self.high_contrast = self.settings.get("high_contrast", False)
+        self.font_size = self.settings.get("font_size", 14)
+        self.fullscreen = False
+
+        # Window setup
         self.title(f"CoinScan v{VERSION}")
         self.geometry(f"{SIZES['window'][0]}x{SIZES['window'][1]}")
         self.update_idletasks()
@@ -212,26 +220,20 @@ class CoinScanApp(tk.Tk):
         self.resizable(False, False)
         self.bind("<F11>", self.toggle_fullscreen)
         self.bind("<Escape>", self.exit_fullscreen)
+
+        # Build UI and apply preferences
         self.create_widgets()
         self.update_language()
         self.apply_contrast()
         self.set_fullscreen(True)
 
+    # Create and arrange all widgets.
     def create_widgets(self) -> None:
-        """
-        Construct all widgets and their layout.
 
-        Widgets are grouped into:
-        - Top bar (logo, title, language flags, contrast)
-        - Sidebar (navigation & exit)
-        - Main content (webcam panel and results panel)
-        - Footer
-        """
-        # Top bar
+        # Top bar with logo and controls
         self.top_bar = tk.Frame(self, bg=COLORS["topbar_bg"], height=48)
         self.top_bar.pack(side="top", fill="x")
 
-        # Logo (left side) - load Prosegur SVG/PNG or fallback
         self.logo_photo = load_logo_photo()
         if self.logo_photo is not None:
             self.logo_label = tk.Label(
@@ -239,6 +241,7 @@ class CoinScanApp(tk.Tk):
             )
             self.logo_label.pack(side="left", padx=(0, 0))
         else:
+            # Text fallback for the logo
             self.logo_label = tk.Label(
                 self.top_bar,
                 text="PROSEGUR",
@@ -247,21 +250,20 @@ class CoinScanApp(tk.Tk):
             )
             self.logo_label.pack(side="left", padx=(8, 0))
 
-        # Title label (text set in update_language)
+        # Title label in top bar
         self.title_label = tk.Label(
             self.top_bar, font=FONTS["title"], bg=COLORS["topbar_bg"]
         )
         self.title_label.pack(side="left", padx=20)
 
-        # Top bar right controls: language flags and contrast toggle
+        # Controls on the top-right (language flags, contrast)
         topbar_controls = tk.Frame(self.top_bar, bg=COLORS["topbar_bg"])
         topbar_controls.pack(side="right", padx=10)
 
-        # Load flag images (safe loader handles missing files)
+        # Load flag images for language selection
         self.flag_de = get_flag_img(ICON_PATHS["flag_de"])
         self.flag_en = get_flag_img(ICON_PATHS["flag_en"])
 
-        # Buttons to switch languages
         tk.Button(
             topbar_controls,
             image=self.flag_de,
@@ -277,10 +279,9 @@ class CoinScanApp(tk.Tk):
             command=lambda: self.set_language("en"),
         ).pack(side="left", padx=2)
 
-        # Spacer between language and contrast button
         tk.Frame(topbar_controls, width=32, bg=COLORS["topbar_bg"]).pack(side="left")
 
-        # Contrast toggle button (text updated by apply_contrast)
+        # Contrast toggle button
         self.contrast_btn = tk.Button(
             topbar_controls,
             text=CONTRAST_ICONS["normal"],
@@ -291,20 +292,17 @@ class CoinScanApp(tk.Tk):
         )
         self.contrast_btn.pack(side="left", padx=8)
 
-        # Sidebar (left)
+        # Sidebar with navigation buttons
         self.sidebar = tk.Frame(
             self, bg=COLORS["sidebar_bg"], width=SIZES["sidebar_width"]
         )
         self.sidebar.pack(side="left", fill="y")
         self.sidebar_buttons = []
 
-        # Build sidebar navigation buttons from SIDEBAR_ICONS.
-        # The Exit button (index 3) is handled separately and placed at the bottom.
         for idx, icon in enumerate(SIDEBAR_ICONS):
             if idx == 3:
-                continue  # Skip Exit button here
+                continue
 
-            # Map index -> action
             if idx == 0:
                 cmd = self.go_home
             elif idx == 1:
@@ -327,7 +325,7 @@ class CoinScanApp(tk.Tk):
             btn.pack(pady=20)
             self.sidebar_buttons.append(btn)
 
-        # Exit button placed at bottom of sidebar
+        # Exit button at the bottom of sidebar
         exit_btn = tk.Button(
             self.sidebar,
             text=SIDEBAR_ICONS[3],
@@ -341,25 +339,24 @@ class CoinScanApp(tk.Tk):
         exit_btn.pack(side="bottom", pady=20)
         self.sidebar_buttons.append(exit_btn)
 
-        # Main content area (center)
+        # Main content area
         self.main_content = tk.Frame(self, bg=COLORS["background"])
         self.main_content.pack(side="left", fill="both", expand=True, padx=0, pady=0)
 
-        # Background image label for main content (globe watermark)
+        # Background image label (kept behind other widgets)
         self._bg_image: Optional[ImageTk.PhotoImage] = None
         self.bg_label = tk.Label(self.main_content, bd=0)
         self.bg_label.place(x=0, y=0, relwidth=1, relheight=1)
-        self.bg_label.lower()  # ensure it stays behind other widgets
+        self.bg_label.lower()
 
-        # Render initial background and update on size changes
+        # Re-render background when the main content is resized
         self.main_content.bind("<Configure>", self._on_main_content_resize)
         self._render_background_image(
             max(2, self.main_content.winfo_width()),
             max(2, self.main_content.winfo_height()),
         )
 
-        # Webcam panel (left side of main content)
-        # Make it visually transparent with a visible border
+        # Left panel: webcam and controls
         self.webcam_panel = tk.Frame(
             self.main_content,
             bg=COLORS["background"],
@@ -371,14 +368,13 @@ class CoinScanApp(tk.Tk):
         )
         self.webcam_panel.pack(side="left", padx=40, pady=40, fill="both", expand=True)
 
-        # Label that will display webcam frames (image updates done by webcam_stream)
-        # Set background to corporate yellow (was black) for live scan area
+        # Label to show webcam image
         self.webcam_label = tk.Label(
             self.webcam_panel, bg=COLORS["background"], fg="#000000"
         )
         self.webcam_label.pack(pady=(10, 6))
 
-        # Primary action button centered under webcam preview
+        # Scan button starts recognition
         self.scan_btn = tk.Button(
             self.webcam_panel,
             font=FONTS["button"],
@@ -396,7 +392,7 @@ class CoinScanApp(tk.Tk):
         )
         self.scan_btn.pack(pady=(6, 10))
 
-        # Font size controls (rearranged): centered pill group under Scan button
+        # Font size controls
         self.font_frame = tk.Frame(self.webcam_panel, bg=COLORS["background"])
         self.font_frame.pack(pady=(0, 8))
         self.fontsize_label = tk.Label(
@@ -441,14 +437,13 @@ class CoinScanApp(tk.Tk):
         )
         self.font_inc_btn.pack(side="left", padx=(4, 0))
 
-        # Listbox to show detection / recognition events under the font controls
+        # Listbox showing recognition results
         self.recognition_list = tk.Listbox(
             self.webcam_panel, font=FONTS["listbox"], height=5, width=50
         )
         self.recognition_list.pack(pady=(0, 8))
 
-        # Results panel (right side of main content)
-        # Make it follow main background but WITH a visible border
+        # Right panel: results summary
         self.results_panel = tk.Frame(
             self.main_content,
             bg=COLORS["background"],
@@ -460,13 +455,11 @@ class CoinScanApp(tk.Tk):
         )
         self.results_panel.pack(side="right", padx=40, pady=40, fill="y")
 
-        # Results label (title for results area) - text set by update_language
         self.results_label = tk.Label(
             self.results_panel, font=FONTS["results"], bg=COLORS["background"]
         )
         self.results_label.pack(pady=(20, 10))
 
-        # Total label shows total recognized value
         self.total_label = tk.Label(
             self.results_panel,
             font=FONTS["total"],
@@ -475,20 +468,17 @@ class CoinScanApp(tk.Tk):
         )
         self.total_label.pack(pady=(0, 10))
 
-        # Footer (left-aligned copyright)
-        self.footer = tk.Frame(
-            self, bg=COLORS["footer_bg"]
-        )  # remove fixed height to allow globe above
+        # Footer with a small globe icon and copyright label
+        self.footer = tk.Frame(self, bg=COLORS["footer_bg"])
         self.footer.pack(side="bottom", fill="x")
 
-        # Globe icon above copyright label
         try:
             globe_img = generate_globe_icon(64)
             self.footer_globe_photo = ImageTk.PhotoImage(globe_img)
             self.footer_globe_label = tk.Label(
                 self.footer, image=self.footer_globe_photo, bg=COLORS["footer_bg"]
             )
-            # Position at bottom-right with padding
+
             self.footer_globe_label.place(relx=1.0, rely=1.0, anchor="se", x=-16, y=-4)
         except Exception:
             self.footer_globe_label = None
@@ -504,18 +494,32 @@ class CoinScanApp(tk.Tk):
         )
         self.footer_label.pack(padx=16, pady=(0, 4), anchor="w")
 
-        # Initialize which size button appears selected AFTER results_panel exists
+        # Apply size and font preferences
         self.set_size(self.current_size)
-        # Initialize font buttons enabled/disabled based on current font size
+
         self.adjust_font_size(0)
 
-        # Attach tooltips (after widgets creation)
+        # Helper to get tooltip text for a key
         def tt(key: str) -> Callable[[], str]:
             return lambda: LANGUAGES[self.current_lang].get("tooltips", {}).get(key, "")
 
-        Tooltip(self.scan_btn, tt("scan_btn"))
-        Tooltip(self.contrast_btn, tt("contrast"))
-        # Language flag buttons: need references -> find first two children of topbar_controls
+        # Verify the Tooltip symbol is callable to avoid conflicts
+        tooltip_obj = globals().get("Tooltip", None)
+        if not callable(tooltip_obj):
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.error("Tooltip symbol is not callable: %r", tooltip_obj)
+            raise TypeError(
+                f"Tooltip symbol is not callable: {tooltip_obj!r}. "
+                "Possible name shadowing or import conflict. "
+                "Inspect where `Tooltip` is defined or overwritten."
+            )
+
+        # Attach tooltips to important controls
+        _InternalTooltip(self.scan_btn, tt("scan_btn"))
+        _InternalTooltip(self.contrast_btn, tt("contrast"))
+
         for child, k in zip(
             topbar_controls.winfo_children()[:2], ["flag_de", "flag_en"]
         ):
@@ -527,78 +531,52 @@ class CoinScanApp(tk.Tk):
         Tooltip(self.webcam_label, tt("webcam"))
         Tooltip(self.results_panel, tt("results_panel"))
 
+    # Handle resizing of the main content (recreate background unless in high contrast).
     def _on_main_content_resize(self, event: tk.Event) -> None:
-        # Skip when in high-contrast mode or minimized sizes
+
         if getattr(self, "high_contrast", False):
             return
         self._render_background_image(max(2, event.width), max(2, event.height))
 
+    # Render and set the background image on the bg_label.
     def _render_background_image(self, width: int, height: int) -> None:
         try:
             img = generate_prosegur_globe_bg(width, height)
             self._bg_image = ImageTk.PhotoImage(img)
             self.bg_label.config(image=self._bg_image)
         except Exception:
-            self.bg_label.config(image="")
+            self.bg_label.config(image="/")
 
+    # Change language and persist setting.
     def set_language(self, lang: str) -> None:
-        """
-        Switch the UI language and reapply any contrast rules that depend on language (if any).
-        """
+
         self.current_lang = lang if lang in LANGUAGES else "en"
+
+        self.settings["language"] = self.current_lang
+        save_settings(self.settings)
+
         self.update_language()
         self.apply_contrast()
 
-    def update_language(self) -> None:
-        """
-        Apply language strings to visible widgets.
-
-        Expects LANGUAGES to be a dict mapping language keys to string dicts.
-        """
-        strings = LANGUAGES.get(self.current_lang, LANGUAGES["en"])
-        self.title_label.config(text=strings.get("title", "CoinScan"))
-        self.scan_btn.config(text=strings.get("scan", "Scan"))
-        self.results_label.config(text=strings.get("results", "Results"))
-        self.total_label.config(text=strings.get("total", "TOTAL: €0.00"))
-        # Clear the recognition list whenever language changes to avoid stale text
-        self.recognition_list.delete(0, "end")
-
-    def resize_window_for_webcam(self) -> None:
-        # Skip geometry changes while in fullscreen
-        if getattr(self, "fullscreen", False):
-            return
-
-        self.update_idletasks()
-        # Safe to access results_panel because create_widgets creates it before set_size is called
-        results_w = max(self.results_panel.winfo_reqwidth(), 320)
-        width = SIZES["sidebar_width"] + 40 + self.current_size[0] + 40 + results_w + 40
-        height = max(700, self.current_size[1] + 40 + 40 + 48 + SIZES["footer_height"])
-        # Keep current window position; only update size
-        self.geometry(f"{width}x{height}")
-
+    # Set webcam size, persist and resize window accordingly.
     def set_size(self, size: Tuple[int, int]) -> None:
-        """
-        Set preferred webcam capture size and update UI state for which size button is active.
-        Actual webcam resolution change happens when the recognition backend reads this value.
-        """
+
         self.current_size = size
+
+        for key, val in SIZES.items():
+            if val == size and key.startswith("webcam_"):
+                self.settings["webcam_size"] = key.replace("webcam_", "")
+                break
+        else:
+
+            self.settings["webcam_size"] = "small"
+
+        save_settings(self.settings)
         self.resize_window_for_webcam()
 
-    def toggle_contrast(self) -> None:
-        """
-        Toggle high contrast mode and apply color changes.
-        """
-        self.high_contrast = not self.high_contrast
-        self.apply_contrast()
-
+    # Adjust all fonts by delta and update controls.
     def adjust_font_size(self, delta: int) -> None:
-        """
-        Adjust numeric font sizes inside the shared FONTS dictionary.
 
-        - Supports tkfont.Font instances as well as tuple/list font descriptions.
-        - Clamps sizes to a practical range to avoid extremes.
-        - After modifying FONTS entries, this method reapplies updated fonts to visible widgets.
-        """
         from tkinter import font as tkfont
 
         MIN_SIZE = 8
@@ -607,7 +585,6 @@ class CoinScanApp(tk.Tk):
         def clamp(v: int) -> int:
             return max(MIN_SIZE, min(MAX_SIZE, int(v)))
 
-        # Probe a representative font to determine current size (prefer button font)
         def get_current_button_size() -> int:
             f = FONTS.get("button")
             if isinstance(f, tkfont.Font):
@@ -616,7 +593,8 @@ class CoinScanApp(tk.Tk):
                 return int(f[1])
             return 12
 
-        for key, f in FONTS.items():
+        # Update the FONTS mapping in-place with clamped sizes.
+        for key, f in list(FONTS.items()):
             try:
                 if isinstance(f, tkfont.Font):
                     current = int(f.cget("size"))
@@ -624,22 +602,29 @@ class CoinScanApp(tk.Tk):
                 elif isinstance(f, tuple) and len(f) >= 2 and isinstance(f[1], int):
                     new_size = clamp(f[1] + delta)
                     FONTS[key] = (f[0], new_size) + tuple(f[2:])
-                elif isinstance(f, (list,)) and len(f) >= 2 and isinstance(f[1], int):
+                elif isinstance(f, list) and len(f) >= 2 and isinstance(f[1], int):
                     new_size = clamp(f[1] + delta)
                     FONTS[key] = [f[0], new_size] + f[2:]
             except Exception:
                 continue
-        # Reapply fonts
-        self.title_label.config(font=FONTS["title"])
-        self.scan_btn.config(font=FONTS["button"])
-        self.recognition_list.config(font=FONTS["listbox"])
-        self.results_label.config(font=FONTS["results"])
-        self.total_label.config(font=FONTS["total"])
-        self.footer_label.config(font=FONTS["footer"])
-        self.contrast_btn.config(font=FONTS["button"])
 
-        # Update inc/dec button state based on new size
         size_now = clamp(get_current_button_size())
+        self.settings["font_size"] = size_now
+        save_settings(self.settings)
+
+        # Apply fonts to widgets (best-effort).
+        try:
+            self.title_label.config(font=FONTS["title"])
+            self.scan_btn.config(font=FONTS["button"])
+            self.recognition_list.config(font=FONTS["listbox"])
+            self.results_label.config(font=FONTS["results"])
+            self.total_label.config(font=FONTS["total"])
+            self.footer_label.config(font=FONTS["footer"])
+            self.contrast_btn.config(font=FONTS["button"])
+        except Exception:
+            pass
+
+        # Enable/disable font change buttons based on limits.
         if hasattr(self, "font_dec_btn"):
             disabled = size_now <= MIN_SIZE
             self.font_dec_btn.config(
@@ -677,8 +662,19 @@ class CoinScanApp(tk.Tk):
                 ),
             )
 
+    # Toggle high-contrast mode and persist.
+    def toggle_contrast(self) -> None:
+
+        self.high_contrast = not self.high_contrast
+
+        self.settings["high_contrast"] = self.high_contrast
+        save_settings(self.settings)
+
+        self.apply_contrast()
+
+    # Apply color scheme depending on high_contrast flag.
     def apply_contrast(self) -> None:
-        """Apply color scheme; ensure results_label and total_label use yellow in normal mode."""
+
         if self.high_contrast:
             bg_main = COLORS["contrast_bg"]
             fg_panel = COLORS["contrast_fg"]
@@ -701,6 +697,8 @@ class CoinScanApp(tk.Tk):
             listbox_fg = "black"
             btn_bg = COLORS["button_bg"]
             btn_fg = COLORS["button_fg"]
+
+        # Update widget colors
         self.configure(bg=bg_main)
         self.top_bar.config(bg=COLORS["topbar_bg"])
         self.title_label.config(bg=COLORS["topbar_bg"], fg="#000000")
@@ -708,9 +706,11 @@ class CoinScanApp(tk.Tk):
         self.contrast_btn.config(
             bg=COLORS["topbar_bg"], fg="#000000", text=contrast_icon
         )
+
         self.sidebar.config(bg=sidebar_bg)
         for btn in self.sidebar_buttons:
             btn.config(bg=sidebar_bg, fg=sidebar_fg)
+
         self.webcam_panel.config(
             bg=bg_main,
             bd=0,
@@ -729,6 +729,7 @@ class CoinScanApp(tk.Tk):
             activebackground=COLORS.get("primary_btn_hover", btn_bg),
             activeforeground=btn_fg,
         )
+
         self.results_panel.config(
             bg=bg_main,
             bd=0,
@@ -738,6 +739,7 @@ class CoinScanApp(tk.Tk):
             highlightcolor=border_color,
         )
         if self.high_contrast:
+            # Adjust panels for high-contrast theme
             self.results_label.config(bg=COLORS["contrast_panel_bg"], fg=fg_panel)
             self.total_label.config(bg=COLORS["contrast_panel_bg"], fg=fg_panel)
             self.footer.config(bg=COLORS["contrast_panel_bg"])
@@ -748,6 +750,7 @@ class CoinScanApp(tk.Tk):
             )
             self.bg_label.config(image="")
         else:
+            # Restore normal theme visuals
             self.results_label.config(bg=COLORS["background"], fg=fg_panel)
             self.total_label.config(bg=COLORS["background"], fg=fg_panel)
             self.footer.config(bg=COLORS["footer_bg"])
@@ -765,18 +768,34 @@ class CoinScanApp(tk.Tk):
             h = max(2, self.main_content.winfo_height())
             self._render_background_image(w, h)
 
-    def start_recognition(self) -> None:
-        """
-        Trigger the recognition pipeline.
+    # Update visible strings for the current language.
+    def update_language(self) -> None:
 
-        Delegates to webcam_stream.update_recognition and passes:
-        - scan button widget (so it can be disabled/label changed)
-        - recognition_list Listbox (to display detections)
-        - total_label (to show total value)
-        - webcam_label (to display video frames)
-        - current_size (preferred capture resolution)
-        - current_lang (for localized recognition messages)
-        """
+        strings = LANGUAGES.get(self.current_lang, LANGUAGES["en"])
+        self.title_label.config(text=strings.get("title", "CoinScan"))
+        self.scan_btn.config(text=strings.get("scan", "Scan"))
+        self.results_label.config(text=strings.get("results", "Results"))
+        self.total_label.config(text=strings.get("total", "TOTAL: €0.00"))
+
+        self.recognition_list.delete(0, "end")
+
+    # Resize the main window to fit chosen webcam size (unless fullscreen).
+    def resize_window_for_webcam(self) -> None:
+
+        if getattr(self, "fullscreen", False):
+            return
+
+        self.update_idletasks()
+
+        results_w = max(self.results_panel.winfo_reqwidth(), 320)
+        width = SIZES["sidebar_width"] + 40 + self.current_size[0] + 40 + results_w + 40
+        height = max(700, self.current_size[1] + 40 + 40 + 48 + SIZES["footer_height"])
+
+        self.geometry(f"{width}x{height}")
+
+    # Start the recognition process (delegates to webcam_stream).
+    def start_recognition(self) -> None:
+
         update_recognition(
             self.scan_btn,
             self.recognition_list,
@@ -786,6 +805,7 @@ class CoinScanApp(tk.Tk):
             self.current_lang,
         )
 
+    # Show About dialog with version and description.
     def show_about(self) -> None:
         strings = LANGUAGES.get(self.current_lang, LANGUAGES["en"])
         about_win = tk.Toplevel(self)
@@ -819,6 +839,7 @@ class CoinScanApp(tk.Tk):
             font=FONTS["about_button"],
         ).pack(pady=(0, 20))
 
+    # Show (placeholder) settings dialog.
     def show_settings(self) -> None:
         strings = LANGUAGES.get(self.current_lang, LANGUAGES["en"])
         settings_win = tk.Toplevel(self)
@@ -844,6 +865,7 @@ class CoinScanApp(tk.Tk):
             font=FONTS["about_button"],
         ).pack(pady=(0, 20))
 
+    # Confirm exit with the user and quit if accepted.
     def confirm_exit(self) -> None:
         confirm_text = LANGUAGES.get(self.current_lang, LANGUAGES["en"]).get(
             "exit_confirm", "Are you sure you want to exit CoinScan?"
@@ -851,32 +873,36 @@ class CoinScanApp(tk.Tk):
         if messagebox.askokcancel("Exit", confirm_text):
             self.quit()
 
+    # Reset UI to initial state.
     def go_home(self) -> None:
         self.recognition_list.delete(0, "end")
         strings = LANGUAGES.get(self.current_lang, LANGUAGES["en"])
         self.total_label.config(text=strings.get("total", "TOTAL: €0.00"))
         self.webcam_label.config(image="")
 
-    # ---- Fullscreen helpers ----
+    # Set fullscreen state (attempt native fullscreen, fallback to maximized).
     def set_fullscreen(self, enable: bool = True) -> None:
-        """
-        Enable/disable fullscreen. Uses attribute where available, falls back to 'zoomed' state.
-        """
+
         self.fullscreen = bool(enable)
         try:
             self.attributes("-fullscreen", self.fullscreen)
         except Exception:
-            # Fallback for platforms not supporting -fullscreen
+
             self.state("zoomed" if self.fullscreen else "normal")
 
+    # Toggle fullscreen mode.
     def toggle_fullscreen(self, event: Optional[tk.Event] = None) -> None:
         self.set_fullscreen(not self.fullscreen)
 
+    # Exit fullscreen mode.
     def exit_fullscreen(self, event: Optional[tk.Event] = None) -> None:
         self.set_fullscreen(False)
 
 
 if __name__ == "__main__":
-    # Entry point for running the app directly.
+
     app = CoinScanApp()
     app.mainloop()
+
+
+_InternalTooltip = Tooltip

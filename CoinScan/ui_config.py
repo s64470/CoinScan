@@ -1,37 +1,45 @@
-﻿LOGO_WIDTH = 50
+﻿# UI configuration constants for CoinScan application.
+# Contains colors, fonts, sizes and icon paths used by the UI.
 
+from pathlib import Path
+
+
+# Default width used for logos and sidebar icons
+LOGO_WIDTH = 50
+
+
+# Color palette used throughout the UI (hex color strings)
 COLORS = {
     "background": "#FFD100",
-    "panel_bg": "white",
+    "panel_bg": "#FFFFFF",
     "sidebar_bg": "#2c3e50",
-    "sidebar_fg": "white",
-    # Slightly darker than background for subtle separation
+    "sidebar_fg": "#FFFFFF",
     "topbar_bg": "#F5C800",
     "button_bg": "#3498db",
-    "button_fg": "white",
+    "button_fg": "#FFFFFF",
     "button_active_bg": "#2980b9",
-    "button_active_fg": "white",
+    "button_active_fg": "#FFFFFF",
     "results_fg": "#3498db",
     "footer_bg": "#FFD100",
     "footer_fg": "#000000",
-    # New: lighter yellow for listbox background
     "listbox_bg": "#FFE680",
     "contrast_bg": "#000000",
     "contrast_fg": "#FFFF00",
     "contrast_panel_bg": "#000000",
     "contrast_sidebar_bg": "#000000",
     "contrast_sidebar_fg": "#FFFF00",
-    # Added user-friendly button palette
-    "primary_btn_bg": "#0057B7",  # vivid accessible blue
+    "primary_btn_bg": "#0057B7",
     "primary_btn_hover": "#004C9F",
-    "font_btn_inc_bg": "#2ecc71",  # green for increase
+    "font_btn_inc_bg": "#2ecc71",
     "font_btn_inc_hover": "#27ae60",
-    "font_btn_dec_bg": "#e67e22",  # orange for decrease
+    "font_btn_dec_bg": "#e67e22",
     "font_btn_dec_hover": "#d35400",
-    "font_btn_disabled_bg": "#b0b0b0",  # neutral disabled state
+    "font_btn_disabled_bg": "#b0b0b0",
     "font_btn_disabled_fg": "#666666",
 }
 
+
+# Font definitions used in the UI: (family, size, [style])
 FONTS = {
     "title": ("Segoe UI", 18, "bold"),
     "sidebar": ("Segoe UI", 16),
@@ -47,11 +55,19 @@ FONTS = {
     "footer": ("Segoe UI", 8),
 }
 
+
+# Directory containing icon image files (relative to this file)
+ICON_DIR = Path(__file__).parent / "icon"
+
+
+# Absolute paths (strings) to specific icon files used by the app
 ICON_PATHS = {
-    "flag_de": "icon/flag_DE.png",
-    "flag_en": "icon/flag_UK.png",
+    "flag_de": str((ICON_DIR / "flag_DE.png").resolve()),
+    "flag_en": str((ICON_DIR / "flag_UK.png").resolve()),
 }
 
+
+# Standard sizes for windows, webcams and UI elements
 SIZES = {
     "window": (1600, 950),
     "webcam_small": (480, 360),
@@ -63,14 +79,28 @@ SIZES = {
     "footer_height": 30,
 }
 
+
+# Unicode icons displayed in the sidebar (simple glyphs)
 SIDEBAR_ICONS = [
-    "\U0001f3e0",
-    "\u2699\ufe0f",
-    "\u2753",
-    "\u23fb",
+    "\U0001f3e0",  # home
+    "\u2699\ufe0f",  # gear
+    "\u2753",  # question mark
+    "\u23fb",  # power / standby
 ]
 
+
+# Icons used to indicate normal vs contrast mode
 CONTRAST_ICONS = {
     "normal": "\U0001f313",
     "contrast": "\u2600\ufe0f",
 }
+
+
+# Check if required icon files exist and warn at import time if missing
+_missing_icons = [k for k, p in ICON_PATHS.items() if not Path(p).exists()]
+if _missing_icons:
+    import warnings
+
+    warnings.warn(
+        f"Missing icon files for: {', '.join(_missing_icons)}", RuntimeWarning
+    )
