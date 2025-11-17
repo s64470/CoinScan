@@ -19,6 +19,7 @@ LANGUAGES: Dict[str, Dict[str, Any]] = {
     "de": {
         "title": "P R O S E G U R",
         "scan": "🔍 Münzen scannen",
+        "rescan": "🔁 Erneut scannen",
         "results": "Ergebnisse",
         "total": "GESAMT: 0,00 €",
         "total_fmt": "GESAMT: {amount} €",
@@ -46,6 +47,7 @@ LANGUAGES: Dict[str, Dict[str, Any]] = {
     "en": {
         "title": "P R O S E G U R",
         "scan": "🔍 Scan Coins",
+        "rescan": "🔁 Rescan",
         "results": "Results",
         "total": "TOTAL: €0.00",
         "total_fmt": "TOTAL: €{amount}",

@@ -94,6 +94,11 @@ def update_recognition(
                 imgtk = ImageTk.PhotoImage(image=pil_img)
                 webcam_label.imgtk = imgtk  # prevent GC
                 webcam_label.configure(image=imgtk)
+                # If webcam preview is set, update the scan button to show "Rescan"
+                try:
+                    scan_button.config(text=get_text(current_lang, "rescan", "Rescan"))
+                except Exception:
+                    pass
             except Exception:
                 pass
 
