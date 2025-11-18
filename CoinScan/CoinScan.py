@@ -1,7 +1,7 @@
 ﻿import os
 import tkinter as tk
 import tkinter.messagebox as messagebox
-from PIL import Image, ImageTk, ImageDraw
+from PIL import Image, ImageTk, ImageDraw, ImageOps
 from typing import Optional, Callable, Tuple
 from settings_manager import load_settings, save_settings, DEFAULT_SETTINGS
 
@@ -11,6 +11,7 @@ from ui_config import (
     COLORS,
     FONTS,
     ICON_PATHS,
+    HIGH_CONTRAST_LOGOS,
     SIZES,
     SIDEBAR_ICONS,
     CONTRAST_ICONS,
@@ -70,45 +71,42 @@ def load_logo_photo() -> Optional[ImageTk.PhotoImage]:
 
 
 # Generate a background image with a faint logo composited in the corner.
-def generate_prosegur_globe_bg(width: int, height: int) -> Image.Image:
-    bg_color = COLORS.get("background", "#FFD100")
+def generate_prosegur_globe_bg(width: int, height: int, high_contrast: bool = False) -> Image.Image:
+    """Generate a background with a faint Prosegur globe.
+
+    When `high_contrast` is True the background color and globe are adapted for
+    high-contrast mode (black background and an inverted globe image).
+    """
+    bg_color = COLORS.get("contrast_bg") if high_contrast else COLORS.get("background", "#FFD100")
     width = max(2, int(width))
     height = max(2, int(height))
     base = Image.new("RGB", (width, height), bg_color).convert("RGBA")
 
-    logo_path = os.path.join(os.path.dirname(__file__), "icon", "logo-prosegur.png")
-    try:
-        if os.path.exists(logo_path):
-            with Image.open(logo_path) as logo:
-                logo = logo.convert("RGBA")
-                target_side = int(min(width, height) * 0.55)
-                ratio = min(target_side / logo.width, target_side / logo.height)
-                new_size = (
-                    max(1, int(logo.width * ratio)),
-                    max(1, int(logo.height * ratio)),
-                )
-                logo_resized = logo.resize(new_size, Image.LANCZOS).copy()
-                alpha = logo_resized.split()[-1].point(lambda a: int(a * 0.20))
-                logo_resized.putalpha(alpha)
-                margin = max(16, new_size[0] // 12)
-                pos = (width - new_size[0] - margin, height - new_size[1] - margin)
-                base.alpha_composite(logo_resized, dest=pos)
-    except (OSError, FileNotFoundError):
-        pass
-    except Exception:
-        pass
-
+    # Previously a faint Prosegur globe was composited into the background.
+    # This function now returns a plain background color without additional
+    # decorative imagery so branding is handled by the explicit right-bottom
+    # logo placed in the UI instead.
     return base.convert("RGB")
 
 
+def _hex_to_rgba(hex_color: str, alpha: int = 255) -> Tuple[int, int, int, int]:
+    hex_color = hex_color.lstrip("#")
+    if len(hex_color) == 3:
+        hex_color = "".join([c * 2 for c in hex_color])
+    r = int(hex_color[0:2], 16)
+    g = int(hex_color[2:4], 16)
+    b = int(hex_color[4:6], 16)
+    return (r, g, b, int(alpha))
+
+
 # Draw a small globe icon used in the footer.
-def generate_globe_icon(diameter: int = 40) -> Image.Image:
+def generate_globe_icon(diameter: int = 40, stroke_color: Tuple[int, int, int, int] = (0, 0, 0, 180)) -> Image.Image:
     diameter = max(16, int(diameter))
     img = Image.new("RGBA", (diameter, diameter), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     radius = diameter // 2 - 2
     cx = cy = diameter // 2
-    stroke = (0, 0, 0, 180)
+    stroke = stroke_color
     draw.ellipse(
         (cx - radius, cy - radius, cx + radius, cy + radius), outline=stroke, width=3
     )
@@ -132,9 +130,7 @@ def generate_globe_icon(diameter: int = 40) -> Image.Image:
 
 # Simple tooltip helper for widgets.
 class Tooltip:
-    def __init__(
-        self, widget: tk.Widget, text_func: Callable[[], str], delay: int = 400
-    ) -> None:
+    def __init__(self, widget: tk.Widget, text_func: Callable[[], str], delay: int = 400) -> None:
         # Save state and bind enter/leave events.
         self.widget = widget
         self.text_func = text_func
@@ -374,6 +370,14 @@ class CoinScanApp(tk.Tk):
         )
         self.webcam_label.pack(pady=(10, 6))
 
+        # Branding logo placed at the right-bottom behind the webcam panel.
+        # This is intentionally behind the webcam so it doesn't obstruct content.
+        self.brand_right_photo: Optional[ImageTk.PhotoImage] = None
+        self.brand_right_label: Optional[tk.Label] = tk.Label(
+            self.main_content, bd=0, bg=COLORS["background"]
+        )
+        self.brand_right_label.place(relx=1.0, rely=1.0, anchor="se", x=-48, y=-(SIZES.get("footer_height", 30) + 8))
+
         # Scan button starts recognition
         self.scan_btn = tk.Button(
             self.webcam_panel,
@@ -523,6 +527,7 @@ class CoinScanApp(tk.Tk):
         for child, k in zip(
             topbar_controls.winfo_children()[:2], ["flag_de", "flag_en"]
         ):
+
             Tooltip(child, tt(k))
         Tooltip(self.sidebar_buttons[0], tt("home"))
         Tooltip(self.sidebar_buttons[1], tt("settings"))
@@ -534,16 +539,70 @@ class CoinScanApp(tk.Tk):
     # Handle resizing of the main content (recreate background unless in high contrast).
     def _on_main_content_resize(self, event: tk.Event) -> None:
 
-        if getattr(self, "high_contrast", False):
-            return
+        # Always re-render the background image on resize. The generator decides
+        # whether to produce a high-contrast background based on current state.
         self._render_background_image(max(2, event.width), max(2, event.height))
 
     # Render and set the background image on the bg_label.
     def _render_background_image(self, width: int, height: int) -> None:
         try:
-            img = generate_prosegur_globe_bg(width, height)
+            img = generate_prosegur_globe_bg(width, height, getattr(self, "high_contrast", False))
             self._bg_image = ImageTk.PhotoImage(img)
             self.bg_label.config(image=self._bg_image)
+            # Place a branding logo behind the webcam at the right-bottom if the
+            # file `icon/logo-prosegur.png` (or a high-contrast alternative) is present.
+            try:
+                if getattr(self, "high_contrast", False):
+                    logo_path = (
+                        HIGH_CONTRAST_LOGOS.get("prosegur")
+                        or os.path.join(os.path.dirname(__file__), "icon", "logo-prosegur.png")
+                    )
+                else:
+                    logo_path = os.path.join(os.path.dirname(__file__), "icon", "logo-prosegur.png")
+
+                if logo_path and os.path.exists(logo_path):
+                    with Image.open(logo_path) as lp:
+                        lp = lp.convert("RGBA")
+                        side_right = max(80, int(min(width, height) * 0.45))
+                        lr = lp.resize((side_right, side_right), Image.LANCZOS).copy()
+                        alpha_factor = 0.95 if getattr(self, "high_contrast", False) else 0.20
+                        la = lr.split()[-1].point(lambda v: int(v * alpha_factor))
+                        if getattr(self, "high_contrast", False):
+                            # Make a white silhouette for high-contrast
+                            white = Image.new("RGBA", lr.size, (255, 255, 255, 0))
+                            white.putalpha(la)
+                            lr = white
+                        else:
+                            r, gch, b, _ = lr.split()
+                            lr = Image.merge("RGBA", (r, gch, b, la))
+
+                        self.brand_right_photo = ImageTk.PhotoImage(lr.copy())
+                        try:
+                            self.brand_right_label.config(image=self.brand_right_photo, bg=(COLORS.get("contrast_panel_bg") if getattr(self, "high_contrast", False) else COLORS["background"]))
+                        except Exception:
+                            try:
+                                self.brand_right_label.config(image=self.brand_right_photo)
+                            except Exception:
+                                pass
+
+                        # Place and ensure it's behind the webcam panel
+                        try:
+                            self.brand_right_label.place(relx=1.0, rely=1.0, anchor="se", x=-48, y=-(SIZES.get("footer_height", 30) + 8))
+                            self.brand_right_label.lower(self.webcam_panel)
+                        except Exception:
+                            pass
+                else:
+                    try:
+                        self.brand_right_label.config(image="")
+                    except Exception:
+                        pass
+            except Exception:
+                try:
+                    self.brand_right_label.config(image="")
+                except Exception:
+                    pass
+            # No additional compositing or branding on the background image.
+            # Background is set above and decorative globe elements have been removed.
         except Exception:
             self.bg_label.config(image="/")
 
@@ -647,19 +706,9 @@ class CoinScanApp(tk.Tk):
             disabled = size_now >= MAX_SIZE
             self.font_inc_btn.config(
                 state=("disabled" if disabled else "normal"),
-                bg=(
-                    COLORS.get("font_btn_disabled_bg")
-                    if disabled
-                    else COLORS.get("primary_btn_bg", COLORS["button_bg"])
-                ),
-                fg=(
-                    COLORS.get("font_btn_disabled_fg")
-                    if disabled
-                    else COLORS["button_fg"]
-                ),
-                activebackground=COLORS.get(
-                    "primary_btn_hover", COLORS["button_active_bg"]
-                ),
+                bg=(COLORS.get("font_btn_disabled_bg") if disabled else COLORS.get("primary_btn_bg", COLORS["button_bg"])),
+                fg=(COLORS.get("font_btn_disabled_fg") if disabled else COLORS["button_fg"]),
+                activebackground=COLORS.get("primary_btn_hover", COLORS["button_active_bg"]),
             )
 
     # Toggle high-contrast mode and persist.
@@ -702,7 +751,43 @@ class CoinScanApp(tk.Tk):
         self.configure(bg=bg_main)
         self.top_bar.config(bg=COLORS["topbar_bg"])
         self.title_label.config(bg=COLORS["topbar_bg"], fg="#000000")
-        self.logo_label.config(bg=COLORS["topbar_bg"])
+        # Update top-bar logo for high-contrast: use a white silhouette when enabled
+        try:
+            if getattr(self, "high_contrast", False):
+                top_logo_path = (
+                    HIGH_CONTRAST_LOGOS.get("prosegur")
+                    or ICON_PATHS.get("prosegur")
+                    or os.path.join(os.path.dirname(__file__), "icon", "logo-prosegur.png")
+                )
+                if top_logo_path and os.path.exists(top_logo_path):
+                    with Image.open(top_logo_path) as li:
+                        size = (SIZES.get("logo_width", 50), SIZES.get("logo_width", 50))
+                        iml = li.convert("RGBA").resize(size, Image.LANCZOS)
+                        # create white silhouette preserving alpha
+                        a = iml.split()[-1].point(lambda v: int(v * 0.95))
+                        white = Image.new("RGBA", iml.size, (255, 255, 255, 0))
+                        white.putalpha(a)
+                        self.logo_photo = ImageTk.PhotoImage(white.copy())
+                        self.logo_label.config(image=self.logo_photo, bg=COLORS["topbar_bg"])
+                else:
+                    # fallback: just set bg
+                    self.logo_label.config(bg=COLORS["topbar_bg"])
+            else:
+                # restore standard logo
+                try:
+                    self.logo_photo = load_logo_photo()
+                    if self.logo_photo is not None:
+                        self.logo_label.config(image=self.logo_photo, bg=COLORS["topbar_bg"])
+                    else:
+                        self.logo_label.config(bg=COLORS["topbar_bg"])
+                except Exception:
+                    self.logo_label.config(bg=COLORS["topbar_bg"])
+        except Exception:
+            # Ensure at least the background is updated
+            try:
+                self.logo_label.config(bg=COLORS["topbar_bg"])
+            except Exception:
+                pass
         self.contrast_btn.config(
             bg=COLORS["topbar_bg"], fg="#000000", text=contrast_icon
         )
@@ -730,6 +815,39 @@ class CoinScanApp(tk.Tk):
             activeforeground=btn_fg,
         )
 
+        # Adjust A- / A+ buttons' font for high-contrast accessibility and
+        # restore standard font when not in high-contrast.
+        try:
+            if hasattr(self, "font_dec_btn") and hasattr(self, "font_inc_btn"):
+                base_font = FONTS.get("button", ("Segoe UI", 14, "bold"))
+                if isinstance(base_font, (tuple, list)) and len(base_font) >= 2 and isinstance(base_font[1], int):
+                    # Increase size for high-contrast to improve legibility
+                    hc_font = (base_font[0], min(base_font[1] + 4, 40), "bold")
+                else:
+                    hc_font = base_font
+
+                if getattr(self, "high_contrast", False):
+                    try:
+                        self.font_dec_btn.config(font=hc_font, bg=btn_bg, fg=btn_fg)
+                    except Exception:
+                        pass
+                    try:
+                        self.font_inc_btn.config(font=hc_font, bg=btn_bg, fg=btn_fg)
+                    except Exception:
+                        pass
+                else:
+                    std_font = FONTS.get("button")
+                    try:
+                        self.font_dec_btn.config(font=std_font, bg=COLORS.get("primary_btn_bg", COLORS["button_bg"]), fg=COLORS.get("button_fg", "#FFFFFF"))
+                    except Exception:
+                        pass
+                    try:
+                        self.font_inc_btn.config(font=std_font, bg=COLORS.get("primary_btn_bg", COLORS["button_bg"]), fg=COLORS.get("button_fg", "#FFFFFF"))
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
         self.results_panel.config(
             bg=bg_main,
             bd=0,
@@ -743,30 +861,90 @@ class CoinScanApp(tk.Tk):
             self.results_label.config(bg=COLORS["contrast_panel_bg"], fg=fg_panel)
             self.total_label.config(bg=COLORS["contrast_panel_bg"], fg=fg_panel)
             self.footer.config(bg=COLORS["contrast_panel_bg"])
-            if self.footer_globe_label:
-                self.footer_globe_label.config(bg=COLORS["contrast_panel_bg"], image="")
-            self.footer_label.config(
-                bg=COLORS["contrast_panel_bg"], fg=COLORS["contrast_fg"]
-            )
-            self.bg_label.config(image="")
+            # Make footer copyright text high-contrast as well
+            try:
+                self.footer_label.config(bg=COLORS["contrast_panel_bg"], fg=COLORS.get("contrast_fg", "#FFFF00"))
+            except Exception:
+                pass
+            # Ensure any branding/logo is visible in high-contrast
+            try:
+                # Compute a reasonable size based on current main content.
+                w = max(2, self.main_content.winfo_width())
+                h = max(2, self.main_content.winfo_height())
+                side_right = max(96, int(min(w, h) * 0.60))
+
+                # Prefer an explicitly supplied high-contrast logo, fall back
+                # to the standard `logo-prosegur.png` in the icon folder.
+                hc_logo_path = (
+                    HIGH_CONTRAST_LOGOS.get("prosegur")
+                    or ICON_PATHS.get("prosegur")
+                    or os.path.join(os.path.dirname(__file__), "icon", "logo-prosegur.png")
+                )
+
+                if hc_logo_path and os.path.exists(hc_logo_path):
+                    with Image.open(hc_logo_path) as im:
+                        img = im.convert("RGBA").resize((side_right, side_right), Image.LANCZOS)
+                        # Use strong alpha in high-contrast so the logo reads clearly
+                        # and convert it to a white silhouette for maximum contrast.
+                        a = img.split()[-1].point(lambda v: int(v * 0.95))
+                        white = Image.new("RGBA", img.size, (255, 255, 255, 0))
+                        white.putalpha(a)
+                        self.prosegur_globe_right_photo = ImageTk.PhotoImage(white.copy())
+                        try:
+                            self.prosegur_globe_right_label.config(bg=COLORS["contrast_panel_bg"], image=self.prosegur_globe_right_photo)
+                        except Exception:
+                            try:
+                                self.prosegur_globe_right_label.config(image=self.prosegur_globe_right_photo)
+                            except Exception:
+                                pass
+                        # Place and ensure it stays behind the webcam panel
+                        try:
+                            self.prosegur_globe_right_label.place(relx=1.0, rely=1.0, anchor="se", x=-48, y=-(SIZES.get("footer_height", 30) + 8))
+                            self.prosegur_globe_right_label.lower(self.webcam_panel)
+                        except Exception:
+                            pass
+                else:
+                    # If no file, clear the label
+                    try:
+                        self.prosegur_globe_right_label.config(image="")
+                    except Exception:
+                        pass
+            except Exception:
+                try:
+                    self.prosegur_globe_right_label.config(image="")
+                except Exception:
+                    pass
         else:
             # Restore normal theme visuals
             self.results_label.config(bg=COLORS["background"], fg=fg_panel)
             self.total_label.config(bg=COLORS["background"], fg=fg_panel)
             self.footer.config(bg=COLORS["footer_bg"])
-            if self.footer_globe_label:
+            # Restore footer copyright color
+            try:
+                self.footer_label.config(bg=COLORS["footer_bg"], fg=COLORS.get("footer_fg", "#000000"))
+            except Exception:
+                pass
+            # Also regenerate the right-bottom globe for normal theme
+            try:
+                w = max(2, self.main_content.winfo_width())
+                h = max(2, self.main_content.winfo_height())
+                # Match the larger branding size used when rendering the logo
+                side_right = max(96, int(min(w, h) * 0.60))
+                globe_right_img = generate_globe_icon(side_right)
+                self.prosegur_globe_right_photo = ImageTk.PhotoImage(globe_right_img)
                 try:
-                    globe_img = generate_globe_icon(64)
-                    self.footer_globe_photo = ImageTk.PhotoImage(globe_img)
-                    self.footer_globe_label.config(
-                        bg=COLORS["footer_bg"], image=self.footer_globe_photo
-                    )
+                  self.prosegur_globe_right_label.config(bg=COLORS["background"], image=self.prosegur_globe_right_photo)
+                  try:
+                    self.prosegur_globe_right_label.lower(self.webcam_panel)
+                  except Exception:
+                    pass
                 except Exception:
-                    self.footer_globe_label.config(image="")
-            self.footer_label.config(bg=COLORS["footer_bg"], fg=COLORS["footer_fg"])
-            w = max(2, self.main_content.winfo_width())
-            h = max(2, self.main_content.winfo_height())
-            self._render_background_image(w, h)
+                  self.prosegur_globe_right_label.config(image="")
+            except Exception:
+              try:
+                self.prosegur_globe_right_label.config(image="")
+              except Exception:
+                pass
 
     # Update visible strings for the current language.
     def update_language(self) -> None:

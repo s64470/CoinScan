@@ -5,6 +5,7 @@ from pathlib import Path
 
 
 # Default width used for logos and sidebar icons
+# Increased to make `logo-prosegur.png` larger in the top bar and other UI locations.
 LOGO_WIDTH = 50
 
 
@@ -34,8 +35,8 @@ COLORS = {
     "font_btn_inc_hover": "#27ae60",
     "font_btn_dec_bg": "#e67e22",
     "font_btn_dec_hover": "#d35400",
-    "font_btn_disabled_bg": "#b0b0b0",
-    "font_btn_disabled_fg": "#666666",
+    "font_btn_disabled_bg": "#000000",
+    "font_btn_disabled_fg": "#FFFF00",
 }
 
 
@@ -64,6 +65,14 @@ ICON_DIR = Path(__file__).parent / "icon"
 ICON_PATHS = {
     "flag_de": str((ICON_DIR / "flag_DE.png").resolve()),
     "flag_en": str((ICON_DIR / "flag_UK.png").resolve()),
+    "prosegur": str((ICON_DIR / "prosegur.png").resolve()),
+    "prosegur_globe": str((ICON_DIR / "prosegur_globe.png").resolve()),
+}
+
+
+# Mapping of logical logos to their high-contrast image paths. UI can use this when contrast mode is enabled.
+HIGH_CONTRAST_LOGOS = {
+    "prosegur": ICON_PATHS["prosegur_globe"],
 }
 
 
@@ -99,8 +108,11 @@ CONTRAST_ICONS = {
 # Check if required icon files exist and warn at import time if missing
 _missing_icons = [k for k, p in ICON_PATHS.items() if not Path(p).exists()]
 if _missing_icons:
-    import warnings
+    # These icon files are optional. Log at DEBUG level instead of raising a
+    # RuntimeWarning so import-time output stays clean in normal runs. Use a
+    # logger so developers can enable debug logging when needed.
+    import logging
 
-    warnings.warn(
-        f"Missing icon files for: {', '.join(_missing_icons)}", RuntimeWarning
+    logging.getLogger(__name__).debug(
+        "Optional icon files missing: %s", ", ".join(_missing_icons)
     )
