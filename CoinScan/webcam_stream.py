@@ -65,7 +65,19 @@ def update_recognition(
     webcam_label: Any,
     current_size: Size,
     current_lang: str,
+    on_results: Optional[
+        Callable[[list[Tuple[float, str, str, int, float]]], None]
+    ] = None,
 ) -> None:
+    """Run a single-frame capture and recognition.
+
+    If `on_results` is provided it will be called on the Tk main thread with a
+    list of tuples for each detected coin: (value, label, colour_label, r, mean_hue).
+    The function no longer inserts coin classification strings into the
+    `recognition` listbox directly; the caller should insert display strings if
+    desired. This allows the caller to maintain an editable model of detected
+    coins for manual post-processing.
+    """
     # Disable UI scan button and start a background stream thread
     scan_button.config(state="disabled")
 
@@ -164,6 +176,7 @@ def update_recognition(
             ui(recognition.delete, 0, "end")
             found = False
             total = 0.0
+            results: list[Tuple[float, str, str, int, float]] = []
 
             if circles is not None:
                 tic("postprocess_circles")
@@ -201,11 +214,10 @@ def update_recognition(
                     toc("classify")
 
                     total += value
-                    # Report classification to recognition widget
-                    ui(
-                        recognition.insert,
-                        "end",
-                        f"Coin: {label} ({colour_label}, r={r}, hue={mean_hue:.1f})",
+                    # Instead of inserting display text here we collect structured
+                    # results and let the caller insert/maintain display strings.
+                    results.append(
+                        (value, label, colour_label, int(r), float(mean_hue))
                     )
 
                     # Draw annotations on the frame for display
@@ -222,6 +234,13 @@ def update_recognition(
                     "end",
                     get_text(current_lang, "no_coin", "No coin detected in centre."),
                 )
+
+            # Notify caller with structured results (may be empty)
+            if on_results is not None:
+                try:
+                    ui(on_results, results)
+                except Exception:
+                    pass
 
             # Update total label with formatted total
             tic("update_total")

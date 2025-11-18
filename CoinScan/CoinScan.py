@@ -1,6 +1,7 @@
 ﻿import os
 import tkinter as tk
 import tkinter.messagebox as messagebox
+import tkinter.simpledialog as simpledialog
 from PIL import Image, ImageTk, ImageDraw, ImageOps
 from typing import Optional, Callable, Tuple
 from settings_manager import load_settings, save_settings, DEFAULT_SETTINGS
@@ -462,6 +463,50 @@ class CoinScanApp(tk.Tk):
             self.webcam_panel, font=FONTS["listbox"], height=5, width=50
         )
         self.recognition_list.pack(pady=(0, 8))
+
+        # Internal model for detected coins to support manual post-processing.
+        # Each entry is a dict: {value, label, colour, radius, hue}
+        self.detected_coins: list[dict] = []
+
+        # Manual edit controls (Add / Edit / Remove)
+        self.edit_frame = tk.Frame(self.webcam_panel, bg=COLORS["background"])
+        self.edit_frame.pack(pady=(0, 8))
+
+        self.add_btn = tk.Button(
+            self.edit_frame,
+            text="Add",
+            font=FONTS["button"],
+            command=self.add_coin,
+            bd=0,
+            padx=8,
+            pady=4,
+        )
+        self.add_btn.pack(side="left", padx=4)
+
+        self.edit_btn = tk.Button(
+            self.edit_frame,
+            text="Edit",
+            font=FONTS["button"],
+            command=self.edit_selected,
+            bd=0,
+            padx=8,
+            pady=4,
+        )
+        self.edit_btn.pack(side="left", padx=4)
+
+        self.remove_btn = tk.Button(
+            self.edit_frame,
+            text="Remove",
+            font=FONTS["button"],
+            command=self.remove_selected,
+            bd=0,
+            padx=8,
+            pady=4,
+        )
+        self.remove_btn.pack(side="left", padx=4)
+
+        # Double-click to edit an entry for convenience
+        self.recognition_list.bind("<Double-1>", lambda e: self.edit_selected())
 
         # Right panel: results summary
         self.results_panel = tk.Frame(
@@ -1072,7 +1117,31 @@ class CoinScanApp(tk.Tk):
             self.webcam_label,
             self.current_size,
             self.current_lang,
+            on_results=self.handle_recognition_results,
         )
+
+    def handle_recognition_results(self, results: list) -> None:
+        """Receive structured detection results from webcam_stream.
+
+        results: list of tuples (value, label, colour_label, radius, mean_hue)
+        This runs on the Tk main thread.
+        """
+        try:
+            self.detected_coins = [
+                {
+                    "value": float(r[0]),
+                    "label": str(r[1]),
+                    "colour": str(r[2]),
+                    "radius": int(r[3]),
+                    "hue": float(r[4]),
+                }
+                for r in results
+            ]
+        except Exception:
+            self.detected_coins = []
+
+        # Update UI list and totals
+        self.update_recognition_list()
 
     # Show About dialog with version and description.
     def show_about(self) -> None:
@@ -1166,6 +1235,267 @@ class CoinScanApp(tk.Tk):
     # Exit fullscreen mode.
     def exit_fullscreen(self, event: Optional[tk.Event] = None) -> None:
         self.set_fullscreen(False)
+
+    # Add a new coin entry (show a dialog to enter details).
+    def add_coin(self) -> None:
+
+        dlg = CoinEditDialog(self)
+        result = dlg.show()
+
+        if result and isinstance(result, dict):
+            # Ensure value is float
+            try:
+                result["value"] = float(result["value"])
+            except ValueError:
+                result["value"] = 0.0
+
+            # Add to internal model
+            self.detected_coins.append(result)
+
+            # Update recognition list display
+            self.update_recognition_list()
+
+    # Edit the currently selected coin entry in the list.
+    def edit_selected(self) -> None:
+        try:
+            selection = self.recognition_list.curselection()
+            if not selection:
+                return
+
+            index = selection[0]
+            current = self.detected_coins[index]
+
+            dlg = CoinEditDialog(self, coin=current)
+            result = dlg.show()
+
+            if result and isinstance(result, dict):
+                # Ensure value is float
+                try:
+                    result["value"] = float(result["value"])
+                except ValueError:
+                    result["value"] = 0.0
+
+                # Update internal model
+                self.detected_coins[index] = result
+
+                # Update recognition list display
+                self.update_recognition_list()
+        except Exception:
+            pass
+
+    # Remove the currently selected coin entry from the list.
+    def remove_selected(self) -> None:
+        try:
+            selection = self.recognition_list.curselection()
+            if not selection:
+                return
+
+            index = selection[0]
+
+            # Remove from internal model
+            del self.detected_coins[index]
+
+            # Update recognition list display
+            self.update_recognition_list()
+        except Exception:
+            pass
+
+    # Update the display list of recognition results and detected coins.
+    def update_recognition_list(self) -> None:
+        try:
+            self.recognition_list.delete(0, "end")
+
+            # Add all detected coins to the listbox
+            for coin in self.detected_coins:
+                label = f"{coin.get('label', '')} ({coin.get('value', 0.0)} €)"
+                self.recognition_list.insert("end", label)
+
+            # Update total label
+            total_value = sum(coin.get("value", 0) for coin in self.detected_coins)
+            self.total_label.config(text=f"TOTAL: €{total_value:.2f}")
+        except Exception:
+            pass
+
+
+# Dialog for adding/editing a coin entry.
+class CoinEditDialog:
+    def __init__(self, parent: tk.Toplevel, coin: Optional[dict] = None) -> None:
+        self.parent = parent
+        self.coin = coin
+
+        # Dialog window
+        self.win = tk.Toplevel(parent)
+        self.win.title("Edit Coin Entry")
+        self.win.configure(bg=COLORS["background"])
+        self.win.transient(parent)
+        self.win.grab_set()
+
+        # Coin details form
+        self.form_frame = tk.Frame(self.win, bg=COLORS["background"])
+        self.form_frame.pack(padx=20, pady=20, fill="x")
+
+        tk.Label(
+            self.form_frame,
+            text="Value (in €):",
+            bg=COLORS["background"],
+            fg="#000000",
+            font=("Segoe UI", 10),
+        ).grid(row=0, column=0, sticky="w", pady=(0, 10))
+
+        self.value_entry = tk.Entry(
+            self.form_frame,
+            font=("Segoe UI", 10),
+            fg="#000000",
+            bd=1,
+            relief="solid",
+        )
+        self.value_entry.grid(row=0, column=1, pady=(0, 10))
+
+        tk.Label(
+            self.form_frame,
+            text="Label:",
+            bg=COLORS["background"],
+            fg="#000000",
+            font=("Segoe UI", 10),
+        ).grid(row=1, column=0, sticky="w", pady=(0, 10))
+
+        self.label_entry = tk.Entry(
+            self.form_frame,
+            font=("Segoe UI", 10),
+            fg="#000000",
+            bd=1,
+            relief="solid",
+        )
+        self.label_entry.grid(row=1, column=1, pady=(0, 10))
+
+        tk.Label(
+            self.form_frame,
+            text="Color:",
+            bg=COLORS["background"],
+            fg="#000000",
+            font=("Segoe UI", 10),
+        ).grid(row=2, column=0, sticky="w", pady=(0, 10))
+
+        self.color_entry = tk.Entry(
+            self.form_frame,
+            font=("Segoe UI", 10),
+            fg="#000000",
+            bd=1,
+            relief="solid",
+        )
+        self.color_entry.grid(row=2, column=1, pady=(0, 10))
+
+        tk.Label(
+            self.form_frame,
+            text="Radius:",
+            bg=COLORS["background"],
+            fg="#000000",
+            font=("Segoe UI", 10),
+        ).grid(row=3, column=0, sticky="w", pady=(0, 10))
+
+        self.radius_entry = tk.Entry(
+            self.form_frame,
+            font=("Segoe UI", 10),
+            fg="#000000",
+            bd=1,
+            relief="solid",
+        )
+        self.radius_entry.grid(row=3, column=1, pady=(0, 10))
+
+        tk.Label(
+            self.form_frame,
+            text="Hue:",
+            bg=COLORS["background"],
+            fg="#000000",
+            font=("Segoe UI", 10),
+        ).grid(row=4, column=0, sticky="w", pady=(0, 10))
+
+        self.hue_entry = tk.Entry(
+            self.form_frame,
+            font=("Segoe UI", 10),
+            fg="#000000",
+            bd=1,
+            relief="solid",
+        )
+        self.hue_entry.grid(row=4, column=1, pady=(0, 10))
+
+        # Buttons
+        self.button_frame = tk.Frame(self.win, bg=COLORS["background"])
+        self.button_frame.pack(pady=(10, 0))
+
+        tk.Button(
+            self.button_frame,
+            text="OK",
+            command=self.on_ok,
+            font=FONTS["button"],
+            bg=COLORS.get("primary_btn_bg", COLORS["button_bg"]),
+            fg=COLORS["button_fg"],
+            activebackground=COLORS.get(
+                "primary_btn_hover", COLORS["button_active_bg"]
+            ),
+            activeforeground=COLORS["button_active_fg"],
+            bd=0,
+            padx=20,
+            pady=8,
+        ).pack(side="left", padx=10)
+
+        tk.Button(
+            self.button_frame,
+            text="Cancel",
+            command=self.on_cancel,
+            font=FONTS["button"],
+            bg=COLORS["button_bg"],
+            fg=COLORS["button_fg"],
+            bd=0,
+            padx=20,
+            pady=8,
+        ).pack(side="left", padx=10)
+
+        # Fill in current coin details if editing
+        if coin:
+            self.value_entry.insert(0, str(coin.get("value", "")))
+            self.label_entry.insert(0, coin.get("label", ""))
+            self.color_entry.insert(0, coin.get("colour", ""))
+            self.radius_entry.insert(0, str(coin.get("radius", "")))
+            self.hue_entry.insert(0, str(coin.get("hue", "")))
+
+        self.win.protocol("WM_DELETE_WINDOW", self.on_cancel)
+        self.value_entry.focus_set()
+
+    # Show the dialog and return the result.
+    def show(self) -> Optional[dict]:
+        self.win.deiconify()
+        self.parent.wait_window(self.win)
+        return getattr(self, "result", None)
+
+    # Handle OK button press: validate and save the coin data.
+    def on_ok(self) -> None:
+        try:
+            value = float(self.value_entry.get())
+            label = self.label_entry.get()
+            colour = self.color_entry.get()
+            radius = float(self.radius_entry.get())
+            hue = float(self.hue_entry.get())
+
+            self.result = {
+                "value": value,
+                "label": label,
+                "colour": colour,
+                "radius": radius,
+                "hue": hue,
+            }
+
+            self.win.destroy()
+        except ValueError:
+            messagebox.showerror(
+                "Invalid input",
+                "Please enter valid values for all fields.",
+                parent=self.win,
+            )
+
+    # Handle Cancel button press: do not save any data.
+    def on_cancel(self) -> None:
+        self.win.destroy()
 
 
 if __name__ == "__main__":
