@@ -1,15 +1,19 @@
-﻿from typing import Any, Dict, Optional
+﻿from typing import Any, Dict, Optional, Mapping
 from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
+from functools import lru_cache
+from types import MappingProxyType
 
 """
 language.py
 
 Localized strings and formatting helpers for the CoinScan UI.
 
-Changes:
-- Small API helpers added: `get_tooltip`.
-- Improved robustness for language lookup and Decimal handling.
-- Minor refactor for clarity and constants.
+Cleanup and improvements:
+- Added caching for language normalization and lookup.
+- Return read-only mapping from `get_strings` to avoid accidental mutation.
+- Added small helpers: `get_about_text`, `get_all_tooltips`.
+- Hardened Decimal conversion to accept Decimal inputs directly.
+- Minor style and docstring clarifications.
 """
 
 # Default fallback language code
@@ -109,8 +113,10 @@ ABOUT_TEXTS: Dict[str, str] = {
 }
 
 _DECIMAL_QUANT = Decimal("0.01")
+SUPPORTED_LANGS = frozenset(LANGUAGES.keys())
 
 
+@lru_cache(maxsize=32)
 def normalize_lang(lang: Optional[str]) -> str:
     """
     Normalize a language identifier to a supported primary code.
@@ -125,15 +131,18 @@ def normalize_lang(lang: Optional[str]) -> str:
         return DEFAULT_LANG
 
     primary = lang.split("-", 1)[0].split("_", 1)[0].lower()
-    return primary if primary in LANGUAGES else DEFAULT_LANG
+    return primary if primary in SUPPORTED_LANGS else DEFAULT_LANG
 
 
-def get_strings(lang: Optional[str]) -> Dict[str, Any]:
+@lru_cache(maxsize=32)
+def get_strings(lang: Optional[str]) -> Mapping[str, Any]:
     """
-    Return the strings dictionary for the normalized language.
-    Always returns a dict (fallback to DEFAULT_LANG).
+    Return a read-only mapping for the normalized language strings.
+    Always returns a mapping (fallback to DEFAULT_LANG).
     """
-    return LANGUAGES.get(normalize_lang(lang), LANGUAGES[DEFAULT_LANG])
+    code = normalize_lang(lang)
+    # Return a read-only view to prevent accidental runtime mutation.
+    return MappingProxyType(LANGUAGES.get(code, LANGUAGES[DEFAULT_LANG]))
 
 
 def get_text(lang: Optional[str], key: str, default: str = "") -> str:
@@ -151,14 +160,35 @@ def get_tooltip(lang: Optional[str], key: str, default: str = "") -> str:
     return get_strings(lang).get("tooltips", {}).get(key, default)
 
 
+def get_all_tooltips(lang: Optional[str]) -> Mapping[str, str]:
+    """
+    Return all tooltips for the language as a read-only mapping.
+    Always returns an empty mapping if none are defined.
+    """
+    return MappingProxyType(get_strings(lang).get("tooltips", {}))
+
+
+def get_about_text(lang: Optional[str]) -> str:
+    """
+    Return the longer about/help text for the specified language.
+    Falls back to English when not available.
+    """
+    code = normalize_lang(lang)
+    return ABOUT_TEXTS.get(code, ABOUT_TEXTS.get(DEFAULT_LANG, ""))
+
+
 def _to_decimal(amount: Any) -> Decimal:
     """
     Safely convert input to a Decimal rounded to two decimal places.
-    Falls back to Decimal('0.00') for invalid inputs.
+    Accepts Decimal, int, float, str-like. Falls back to Decimal('0.00')
+    for invalid inputs.
     """
     try:
-        # Use str(amount) to avoid float precision issues when a float is passed.
-        d = Decimal(str(amount))
+        if isinstance(amount, Decimal):
+            d = amount
+        else:
+            # Use str(amount) to avoid float precision issues when a float is passed.
+            d = Decimal(str(amount))
         return d.quantize(_DECIMAL_QUANT, rounding=ROUND_HALF_UP)
     except (InvalidOperation, ValueError, TypeError):
         return Decimal("0.00")
@@ -182,4 +212,9 @@ def format_total(lang: Optional[str], amount: Any) -> str:
     if normalize_lang(lang) == "de":
         amt_str = amt_str.replace(".", ",")
 
-    return fmt.format(amount=amt_str)
+    # Ensure formatting succeeds even if format string is not well-formed.
+    try:
+        return fmt.format(amount=amt_str)
+    except Exception:
+        # Fallback to a simple composed string
+        return f"TOTAL: €{amt_str}"

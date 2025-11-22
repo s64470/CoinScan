@@ -2,17 +2,24 @@
 UI configuration constants for the CoinScan application.
 
 Contains colors, fonts, sizes and icon paths used by the UI.
-This file provides typed constants and a small helper for retrieving icon paths.
+This module exposes typed constants and small helpers for retrieving
+and inspecting icon paths.
 """
 
 from pathlib import Path
-from typing import Dict, Tuple
+from typing import Final, Mapping, Tuple, Union, Sequence
+
+# Type aliases for clarity
+FontDef = Tuple[
+    Union[str, int], ...
+]  # font tuples vary: ("Family", size[, "style"...])
+SizeDef = Union[Tuple[int, int], int]
 
 # Default width used for logos and sidebar icons.
-LOGO_WIDTH: int = 50
+LOGO_WIDTH: Final[int] = 50
 
 # Color palette used throughout the UI (hex color strings).
-COLORS: Dict[str, str] = {
+COLORS: Final[Mapping[str, str]] = {
     "background": "#FFD100",
     "panel_bg": "#FFFFFF",
     "sidebar_bg": "#2c3e50",
@@ -41,8 +48,8 @@ COLORS: Dict[str, str] = {
     "font_btn_disabled_fg": "#FFFF00",
 }
 
-# Font definitions used in the UI: (family, size, [style]).
-FONTS: Dict[str, Tuple] = {
+# Font definitions used in the UI: (family, size, [style...]).
+FONTS: Final[Mapping[str, FontDef]] = {
     "title": ("Segoe UI", 18, "bold"),
     "sidebar": ("Segoe UI", 16),
     "version": ("Segoe UI", 10, "bold"),
@@ -58,29 +65,29 @@ FONTS: Dict[str, Tuple] = {
 }
 
 # Directory containing icon image files (relative to this file).
-ICON_DIR: Path = Path(__file__).parent / "icon"
+ICON_DIR: Final[Path] = (Path(__file__).parent / "icon").resolve(strict=False)
 
 # Known icon filenames (keeps mapping clear and easy to extend).
-_ICON_FILES: Dict[str, str] = {
+_ICON_FILES: Final[Mapping[str, str]] = {
     "flag_de": "flag_DE.png",
     "flag_en": "flag_UK.png",
     "prosegur": "prosegur.png",
     "prosegur_globe": "prosegur_globe.png",
 }
 
-# Absolute-ish paths (string) to specific icon files used by the app.
-# Use resolve(strict=False) to avoid raising if files are not present at import time.
-ICON_PATHS: Dict[str, str] = {
-    key: str((ICON_DIR / filename).resolve(strict=False)) for key, filename in _ICON_FILES.items()
+# Resolved paths (non-strict resolve so import doesn't fail if files are absent).
+ICON_PATHS: Final[Mapping[str, str]] = {
+    key: str((ICON_DIR / filename).resolve(strict=False))
+    for key, filename in _ICON_FILES.items()
 }
 
 # Mapping of logical logos to their high-contrast image paths.
-HIGH_CONTRAST_LOGOS: Dict[str, str] = {
-    "prosegur": ICON_PATHS["prosegur_globe"],
+HIGH_CONTRAST_LOGOS: Final[Mapping[str, str]] = {
+    "prosegur": ICON_PATHS.get("prosegur_globe", "")
 }
 
 # Standard sizes for windows, webcams and UI elements.
-SIZES: Dict[str, Tuple[int, int] | int] = {
+SIZES: Final[Mapping[str, SizeDef]] = {
     "window": (1600, 950),
     "webcam_small": (480, 360),
     "webcam_large": (800, 600),
@@ -92,7 +99,7 @@ SIZES: Dict[str, Tuple[int, int] | int] = {
 }
 
 # Unicode icons displayed in the sidebar (simple glyphs).
-SIDEBAR_ICONS: Tuple[str, ...] = (
+SIDEBAR_ICONS: Final[Tuple[str, ...]] = (
     "\U0001f3e0",  # home
     "\u2699\ufe0f",  # gear
     "\u2753",  # question mark
@@ -100,7 +107,7 @@ SIDEBAR_ICONS: Tuple[str, ...] = (
 )
 
 # Icons used to indicate normal vs contrast mode.
-CONTRAST_ICONS: Dict[str, str] = {
+CONTRAST_ICONS: Final[Mapping[str, str]] = {
     "normal": "\U0001f313",
     "contrast": "\u2600\ufe0f",
 }
@@ -108,10 +115,31 @@ CONTRAST_ICONS: Dict[str, str] = {
 
 def icon_path(name: str) -> str:
     """
-    Return the path string for a named icon. If the icon is unknown returns an empty string.
-    Use this helper in UI code to avoid accessing ICON_PATHS directly.
+    Return the absolute path string for a named icon. If the icon is unknown returns an empty string.
+
+    Prefer this helper in UI code instead of accessing ICON_PATHS directly.
     """
     return ICON_PATHS.get(name, "")
+
+
+def icon_exists(name: str) -> bool:
+    """
+    Return True if the named icon file exists on disk.
+
+    Uses the resolved path stored in ICON_PATHS and checks the filesystem.
+    """
+    p = icon_path(name)
+    if not p:
+        return False
+    try:
+        return Path(p).is_file()
+    except Exception:
+        return False
+
+
+def available_icons() -> Tuple[str, ...]:
+    """Return the tuple of known icon keys (stable order)."""
+    return tuple(ICON_PATHS.keys())
 
 
 __all__ = [
@@ -125,4 +153,6 @@ __all__ = [
     "SIDEBAR_ICONS",
     "CONTRAST_ICONS",
     "icon_path",
+    "icon_exists",
+    "available_icons",
 ]

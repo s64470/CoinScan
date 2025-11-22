@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
+"""Manage loading and saving application settings with safe, atomic writes."""
+from pathlib import Path
 import json
+import logging
 import os
 import tempfile
-import logging
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Default settings used when user settings are missing or invalid.
 DEFAULT_SETTINGS = {
     "language": "en",
     "webcam_size": "small",
@@ -17,13 +17,17 @@ DEFAULT_SETTINGS = {
 
 
 def _default_settings_path() -> Path:
-    # Determine the path for the settings file.
-    # Respect COINSCAN_SETTINGS env var if set; it may point to a file or dir.
+    """Resolve the settings file path.
+
+    - Honor COINSCAN_SETTINGS env var (file or directory).
+    - Otherwise use platform-appropriate config directory.
+    - Fall back to CWD if directory creation fails.
+    """
     env = os.getenv("COINSCAN_SETTINGS")
     if env:
         p = Path(env)
+        # If env points to an existing directory, use a filename inside it.
         if p.is_dir():
-            # If env is a directory ensure it exists and use a default filename inside it.
             try:
                 p.mkdir(parents=True, exist_ok=True)
             except Exception:
@@ -33,7 +37,8 @@ def _default_settings_path() -> Path:
                     exc_info=True,
                 )
             return p / "coinscan_settings.json"
-        # If env points to a file, ensure parent directory exists and use that file.
+
+        # Treat env as a file path (ensure parent exists).
         try:
             p.parent.mkdir(parents=True, exist_ok=True)
         except Exception:
@@ -52,11 +57,9 @@ def _default_settings_path() -> Path:
 
     cfg_dir = base / "CoinScan"
     try:
-        # Try to create the application config directory and return path inside it.
         cfg_dir.mkdir(parents=True, exist_ok=True)
         return cfg_dir / "coinscan_settings.json"
     except Exception:
-        # If creation fails, fall back to current working directory.
         logger.debug(
             "Failed to create config directory %s, falling back to cwd",
             cfg_dir,
@@ -65,31 +68,34 @@ def _default_settings_path() -> Path:
         return Path.cwd() / "coinscan_settings.json"
 
 
-# Resolved file path used by load/save functions.
 SETTINGS_FILE: Path = _default_settings_path()
 
 
 def _validate_and_merge(data: object) -> dict:
-    # Ensure incoming data is a dict and merge it with defaults.
+    """Return a merged settings dict: defaults + validated incoming values.
+
+    Unknown keys from the incoming data are preserved. For known keys, the
+    incoming value is accepted only if its type exactly matches the default's
+    type; otherwise the default value is used and a debug message is emitted.
+    """
     if not isinstance(data, dict):
         return DEFAULT_SETTINGS.copy()
 
-    # Start with defaults. Keep any unknown keys from incoming data.
     merged = DEFAULT_SETTINGS.copy()
+    # Preserve unknown keys provided by the user.
     merged.update({k: v for k, v in data.items() if k not in DEFAULT_SETTINGS})
 
-    # For each known setting, validate its type and use either incoming or default.
-    for k, default_value in DEFAULT_SETTINGS.items():
-        if k in data:
-            incoming = data[k]
+    for key, default_value in DEFAULT_SETTINGS.items():
+        if key in data:
+            incoming = data[key]
+            # Use exact type match to avoid accepting e.g. bool where int is expected.
             if type(incoming) is type(default_value):
-                merged[k] = incoming
+                merged[key] = incoming
             else:
-                # Type mismatch -> fall back to default and log debug info.
-                merged[k] = default_value
+                merged[key] = default_value
                 logger.debug(
                     "Setting %s has wrong type (%s) - using default (%s)",
-                    k,
+                    key,
                     type(incoming),
                     type(default_value),
                 )
@@ -97,7 +103,7 @@ def _validate_and_merge(data: object) -> dict:
 
 
 def load_settings() -> dict:
-    # Load settings from disk if present. Return validated settings or defaults.
+    """Load settings from disk and return validated settings, or defaults on error."""
     try:
         if SETTINGS_FILE.exists():
             with SETTINGS_FILE.open("r", encoding="utf-8") as f:
@@ -109,7 +115,7 @@ def load_settings() -> dict:
 
 
 def save_settings(settings: dict) -> None:
-    # Persist settings to disk using an atomic replace via a temporary file.
+    """Persist settings to disk using an atomic replace via a temporary file."""
     if not isinstance(settings, dict):
         raise TypeError("settings must be a dict")
 
@@ -125,38 +131,31 @@ def save_settings(settings: dict) -> None:
             exc_info=True,
         )
 
-    tmp_fp = None
+    tmp_path = None
     try:
-        # Create a temp file in the same directory for atomic replace.
-        fd, tmp_path = tempfile.mkstemp(
+        # Use NamedTemporaryFile(delete=False) to allow safe replace on Windows.
+        with tempfile.NamedTemporaryFile(
             prefix=SETTINGS_FILE.name + ".",
             suffix=".tmp",
             dir=str(SETTINGS_FILE.parent),
-        )
-        # Open file descriptor as a text file for JSON writing.
-        tmp_fp = os.fdopen(fd, "w", encoding="utf-8")
-        json.dump(to_save, tmp_fp, indent=2, ensure_ascii=False)
-        tmp_fp.flush()
-        # Ensure data is flushed to disk.
-        os.fsync(tmp_fp.fileno())
-        tmp_fp.close()
-        tmp_fp = None
+            mode="w",
+            encoding="utf-8",
+            delete=False,
+        ) as tmp_fp:
+            json.dump(to_save, tmp_fp, indent=2, ensure_ascii=False)
+            tmp_fp.flush()
+            os.fsync(tmp_fp.fileno())
+            tmp_path = Path(tmp_fp.name)
+
         # Atomically replace the target file with the temp file.
-        os.replace(tmp_path, SETTINGS_FILE)
+        os.replace(str(tmp_path), str(SETTINGS_FILE))
     except Exception:
-        # On any error, log and try to clean up the temporary file/handle.
         logger.exception("Failed to save settings")
+        # Best-effort cleanup of temporary file.
         try:
-            if tmp_fp is not None:
-                tmp_fp.close()
-        except Exception:
-            pass
-        try:
-            if "tmp_path" in locals() and Path(tmp_path).exists():
-                Path(tmp_path).unlink()
+            if tmp_path is not None and tmp_path.exists():
+                tmp_path.unlink()
         except Exception:
             logger.debug(
-                "Failed to remove temporary settings file: %s",
-                locals().get("tmp_path"),
-                exc_info=True,
+                "Failed to remove temporary settings file: %s", tmp_path, exc_info=True
             )
