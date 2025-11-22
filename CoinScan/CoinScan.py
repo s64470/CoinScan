@@ -139,9 +139,7 @@ def generate_globe_icon(
 
 # Simple tooltip helper for widgets.
 class Tooltip:
-    def __init__(
-        self, widget: tk.Widget, text_func: Callable[[], str], delay: int = 400
-    ) -> None:
+    def __init__(self, widget: tk.Widget, text_func: Callable[[], str], delay: int = 400) -> None:
         # Save state and bind enter/leave events.
         self.widget = widget
         self.text_func = text_func
@@ -505,6 +503,17 @@ class CoinScanApp(tk.Tk):
         )
         self.remove_btn.pack(side="left", padx=4)
 
+        self.total_btn = tk.Button(
+            self.edit_frame,
+            text="Total",
+            font=FONTS["button"],
+            command=self.show_total,
+            bd=0,
+            padx=8,
+            pady=4,
+        )
+        self.total_btn.pack(side="left", padx=4)
+
         # Double-click to edit an entry for convenience
         self.recognition_list.bind("<Double-1>", lambda e: self.edit_selected())
 
@@ -588,7 +597,6 @@ class CoinScanApp(tk.Tk):
         for child, k in zip(
             topbar_controls.winfo_children()[:2], ["flag_de", "flag_en"]
         ):
-
             Tooltip(child, tt(k))
         Tooltip(self.sidebar_buttons[0], tt("home"))
         Tooltip(self.sidebar_buttons[1], tt("settings"))
@@ -1091,7 +1099,11 @@ class CoinScanApp(tk.Tk):
         self.results_label.config(text=strings.get("results", "Results"))
         self.total_label.config(text=strings.get("total", "TOTAL: €0.00"))
 
-        self.recognition_list.delete(0, "end")
+        # Re-populate the listbox from the internal model so values are preserved
+        # when the language changes. If the recognition_list hasn't been created yet
+        # (e.g. called early during init), skip safely.
+        if hasattr(self, "recognition_list") and hasattr(self, "detected_coins"):
+            self.update_recognition_list()
 
     # Resize the main window to fit chosen webcam size (unless fullscreen).
     def resize_window_for_webcam(self) -> None:
@@ -1127,7 +1139,8 @@ class CoinScanApp(tk.Tk):
         This runs on the Tk main thread.
         """
         try:
-            self.detected_coins = [
+            # Parse incoming results into normalized dicts
+            new_coins = [
                 {
                     "value": float(r[0]),
                     "label": str(r[1]),
@@ -1138,7 +1151,17 @@ class CoinScanApp(tk.Tk):
                 for r in results
             ]
         except Exception:
-            self.detected_coins = []
+            new_coins = []
+
+        # Append new detections to the existing list so rescans accumulate.
+        # Avoid exact-duplicate entries to reduce accidental double-counting.
+        try:
+            for coin in new_coins:
+                if coin not in self.detected_coins:
+                    self.detected_coins.append(coin)
+        except Exception:
+            # Fallback: if appending fails, replace the list to keep UI consistent
+            self.detected_coins = new_coins
 
         # Update UI list and totals
         self.update_recognition_list()
@@ -1300,18 +1323,41 @@ class CoinScanApp(tk.Tk):
         except Exception:
             pass
 
-    # Update the display list of recognition results and detected coins.
+    def get_total_value(self) -> float:
+        """Return the total value of detected coins as a float.
+        Convert each entry safely and ignore invalid values instead of failing
+        the whole sum.
+        """
+        total = 0.0
+        for coin in getattr(self, "detected_coins", []):
+            v = coin.get("value", 0)
+            try:
+                total += float(v)
+            except Exception:
+                # ignore malformed / non-numeric entries
+                continue
+        return total
+
+    def show_total(self) -> None:
+        """Display the total value in a message box."""
+        total = self.get_total_value()
+        messagebox.showinfo("Total", f"TOTAL: €{total:.2f}", parent=self)
+
     def update_recognition_list(self) -> None:
         try:
             self.recognition_list.delete(0, "end")
 
-            # Add all detected coins to the listbox
+            # Add all detected coins to the listbox, format values safely
             for coin in self.detected_coins:
-                label = f"{coin.get('label', '')} ({coin.get('value', 0.0)} €)"
+                try:
+                    value = float(coin.get("value", 0))
+                except Exception:
+                    value = 0.0
+                label = f"{coin.get('label', '')} ({value:.2f} €)"
                 self.recognition_list.insert("end", label)
 
-            # Update total label
-            total_value = sum(coin.get("value", 0) for coin in self.detected_coins)
+            # Update total label using the centralized accessor
+            total_value = self.get_total_value()
             self.total_label.config(text=f"TOTAL: €{total_value:.2f}")
         except Exception:
             pass
@@ -1504,5 +1550,11 @@ if __name__ == "__main__":
     app.mainloop()
 
 
-_InternalTooltip = Tooltip
-_InternalTooltip = Tooltip
+def sum_detected_coins(detected_coins: list[dict]) -> float:
+    total = 0.0
+    for coin in detected_coins:
+        try:
+            total += float(coin.get("value", 0))
+        except Exception:
+            continue
+    return total

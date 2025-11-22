@@ -1,6 +1,5 @@
 from __future__ import annotations
 import threading
-import time
 from typing import Tuple, Callable, Any, Dict, Optional
 
 import cv2
@@ -65,14 +64,12 @@ def update_recognition(
     webcam_label: Any,
     current_size: Size,
     current_lang: str,
-    on_results: Optional[
-        Callable[[list[Tuple[float, str, str, int, float]]], None]
-    ] = None,
+    on_results: Optional[Callable[[list[Tuple[float, str]]], None]] = None,
 ) -> None:
     """Run a single-frame capture and recognition.
 
     If `on_results` is provided it will be called on the Tk main thread with a
-    list of tuples for each detected coin: (value, label, colour_label, r, mean_hue).
+    list of tuples for each detected coin: (value, label).
     The function no longer inserts coin classification strings into the
     `recognition` listbox directly; the caller should insert display strings if
     desired. This allows the caller to maintain an editable model of detected
@@ -82,17 +79,6 @@ def update_recognition(
     scan_button.config(state="disabled")
 
     def stream() -> None:
-        # Timings for performance debugging
-        times: Dict[str, float] = {}
-
-        def tic(name: str) -> None:
-            # Start timing a step
-            times[name] = -time.perf_counter()
-
-        def toc(name: str) -> None:
-            # Stop timing a step
-            times[name] += time.perf_counter()
-
         def ui(callable_obj: Callable, *args, **kwargs) -> None:
             # Schedule a callable on the Tkinter main thread if possible
             try:
@@ -117,15 +103,11 @@ def update_recognition(
         cap: Optional[cv2.VideoCapture] = None
         try:
             # Open camera
-            tic("camera_open")
             cap = cv2.VideoCapture(0)
-            toc("camera_open")
 
             # Set requested capture size
-            tic("set_props")
             cap.set(cv2.CAP_PROP_FRAME_WIDTH, current_size[0])
             cap.set(cv2.CAP_PROP_FRAME_HEIGHT, current_size[1])
-            toc("set_props")
 
             # Check camera opened successfully
             if not cap.isOpened():
@@ -137,9 +119,7 @@ def update_recognition(
                 return
 
             # Read one frame from camera
-            tic("read")
             ret, frame = cap.read()
-            toc("read")
             if not ret or frame is None:
                 ui(
                     recognition.insert,
@@ -149,17 +129,12 @@ def update_recognition(
                 return
 
             # Convert to grayscale for circle detection
-            tic("cvt_gray")
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            toc("cvt_gray")
 
             # Reduce noise with median blur
-            tic("median_blur")
             gray_blur = cv2.medianBlur(gray, 7)
-            toc("median_blur")
 
             # Detect circles using Hough transform
-            tic("hough")
             circles = cv2.HoughCircles(
                 gray_blur,
                 cv2.HOUGH_GRADIENT,
@@ -170,58 +145,49 @@ def update_recognition(
                 minRadius=15,
                 maxRadius=90,
             )
-            toc("hough")
 
             # Clear previous recognition messages
             ui(recognition.delete, 0, "end")
             found = False
             total = 0.0
-            results: list[Tuple[float, str, str, int, float]] = []
+            # Results now only include (value, label)
+            results: list[Tuple[float, str]] = []
 
             # Variables to hold detected circle for display compositing
             detected_circle = None
 
             if circles is not None:
-                tic("postprocess_circles")
                 # Round and convert circles to uint16 Nx3 array
                 circles_uint = np.uint16(np.around(circles))[0, :]
                 # Keep only circles near the centre
                 ccoins = centre_coins(circles_uint, frame.shape)
-                toc("postprocess_circles")
 
                 if ccoins:
                     # Choose the largest centred coin
                     x, y, r = max(ccoins, key=lambda c: c[2])
 
                     # Create mask for coin region and extract pixels
-                    tic("mask")
                     mask = np.zeros(gray.shape, dtype=np.uint8)
                     cv2.circle(mask, (x, y), r, 255, -1)
                     coin_pixels = cv2.bitwise_and(frame, frame, mask=mask)
-                    toc("mask")
 
                     # Convert masked coin region to HSV for hue analysis
-                    tic("cvt_hsv")
                     coin_hsv = cv2.cvtColor(coin_pixels, cv2.COLOR_BGR2HSV)
-                    toc("cvt_hsv")
 
                     # Compute mean hue inside the mask
-                    tic("mean_hue")
                     coin_hue = coin_hsv[:, :, 0][mask == 255].astype(np.float64)
                     mean_hue = float(np.mean(coin_hue)) if coin_hue.size > 0 else 0.0
-                    toc("mean_hue")
 
                     # Classify coin by hue and radius
-                    tic("classify")
                     value, label, colour_label = classify_coin(mean_hue, r)
-                    toc("classify")
 
                     total += value
-                    # Instead of inserting display text here we collect structured
-                    # results and let the caller insert/maintain display strings.
-                    results.append(
-                        (value, label, colour_label, int(r), float(mean_hue))
-                    )
+                    # Collect only the minimal structured result (value, label).
+                    results.append((value, label))
+
+                    # Insert a simple coin entry into the recognition listbox (no colour, radius or hue)
+                    if on_results is None:
+                        ui(recognition.insert, "end", label)
 
                     # Save detected circle for later compositing on the display image.
                     detected_circle = (int(x), int(y), int(r))
@@ -241,30 +207,21 @@ def update_recognition(
                     ui(on_results, results)
                 except Exception:
                     pass
-
-            # Update total label with formatted total
-            tic("update_total")
-            ui(total_label.config, text=format_total(current_lang, total))
-            toc("update_total")
+            else:
+                # Only update total_label here when no on_results handler is provided.
+                ui(total_label.config, text=format_total(current_lang, total))
 
             # Convert BGR to RGB for PIL and resize for display
-            tic("cvt_rgb")
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            toc("cvt_rgb")
 
-            tic("cv_resize")
             resized = cv2.resize(
                 frame_rgb, current_size, interpolation=cv2.INTER_LINEAR
             )
-            toc("cv_resize")
 
             # Convert NumPy array to PIL Image
-            tic("to_pil")
             img = Image.fromarray(resized)
-            toc("to_pil")
 
             # If a coin was detected, blur everything outside the detected circle.
-            tic("blur_outside_circle")
             try:
                 if detected_circle is not None:
                     # Scale circle coordinates from capture frame to resized image
@@ -315,52 +272,16 @@ def update_recognition(
             except Exception:
                 # If anything goes wrong, fall back to the unmodified image
                 pass
-            toc("blur_outside_circle")
 
             # Set image on the webcam label (UI)
-            tic("photoimage")
             ui(set_webcam_image, img)
-            toc("photoimage")
         finally:
             # Ensure camera is released and UI button re-enabled
             if cap is not None:
-                tic("release")
                 try:
                     cap.release()
                 except Exception:
                     pass
-                toc("release")
             ui(scan_button.config, state="normal")
-            # Print or display timing summary if available
-            if times:
-                times_ms = {k: int(v * 1000) for k, v in times.items()}
-                order = [
-                    "camera_open",
-                    "set_props",
-                    "read",
-                    "cvt_gray",
-                    "median_blur",
-                    "hough",
-                    "postprocess_circles",
-                    "mask",
-                    "cvt_hsv",
-                    "mean_hue",
-                    "classify",
-                    "annotate",
-                    "update_total",
-                    "cvt_rgb",
-                    "cv_resize",
-                    "to_pil",
-                    "photoimage",
-                    "release",
-                ]
-                summary = "Perf:" + ", ".join(
-                    f"{k}={times_ms[k]}ms" for k in order if k in times_ms
-                )
-                try:
-                    ui(recognition.insert, "end", summary)
-                except Exception:
-                    pass
-                print("Perf details (ms):", times_ms)
 
     threading.Thread(target=stream, daemon=True).start()
