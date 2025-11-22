@@ -1,10 +1,9 @@
 ﻿import os
 import tkinter as tk
 import tkinter.messagebox as messagebox
-import tkinter.simpledialog as simpledialog
-from PIL import Image, ImageTk, ImageDraw, ImageOps
+from PIL import Image, ImageTk, ImageDraw
 from typing import Optional, Callable, Tuple
-from settings_manager import load_settings, save_settings, DEFAULT_SETTINGS
+from settings_manager import load_settings, save_settings
 
 from webcam_stream import update_recognition
 from language import LANGUAGES, ABOUT_TEXTS
@@ -29,10 +28,8 @@ def get_flag_img(path: str) -> ImageTk.PhotoImage:
         with Image.open(full_path) as img:
             img = img.convert("RGBA").resize(SIZES["flag"], Image.LANCZOS)
             return ImageTk.PhotoImage(img.copy())
-    except (FileNotFoundError, OSError):
-        img = Image.new("RGBA", SIZES["flag"], "grey")
-        return ImageTk.PhotoImage(img)
     except Exception:
+        # Any failure -> return a simple grey placeholder
         img = Image.new("RGBA", SIZES["flag"], "grey")
         return ImageTk.PhotoImage(img)
 
@@ -42,25 +39,18 @@ def load_logo_photo() -> Optional[ImageTk.PhotoImage]:
     base = os.path.dirname(__file__)
     size = (SIZES["logo_width"], SIZES["logo_width"])
     png_path = os.path.join(base, "icon", "logo-prosegur.png")
-    if os.path.exists(png_path):
-        try:
+    try:
+        if os.path.exists(png_path):
             with Image.open(png_path) as img:
                 img = img.convert("RGBA").resize(size, Image.LANCZOS)
                 return ImageTk.PhotoImage(img.copy())
-        except (OSError, FileNotFoundError):
-            pass
-        except Exception:
-            pass
-    try:
         # Draw a simple circular fallback logo
         img = Image.new("RGBA", size, (0, 0, 0, 0))
         d = ImageDraw.Draw(img)
         r = size[0] // 2 - 2
         cx = cy = size[0] // 2
         d.ellipse((cx - r, cy - r, cx + r, cy + r), fill="#000000")
-        d.rectangle(
-            (cx - r // 3, cy - r // 2, cx - r // 6, cy + r // 2), fill="#FFD100"
-        )
+        d.rectangle((cx - r // 3, cy - r // 2, cx - r // 6, cy + r // 2), fill="#FFD100")
         d.ellipse(
             (cx - r // 6, cy - r // 3, cx + r // 2, cy + r // 3),
             outline="#FFD100",
@@ -75,25 +65,17 @@ def load_logo_photo() -> Optional[ImageTk.PhotoImage]:
 def generate_prosegur_globe_bg(
     width: int, height: int, high_contrast: bool = False
 ) -> Image.Image:
-    """Generate a background with a faint Prosegur globe.
+    """Generate a plain background color for the main content.
 
-    When `high_contrast` is True the background color and globe are adapted for
-    high-contrast mode (black background and an inverted globe image).
+    Previously this composited a faint globe image; branding is now handled by
+    explicit right-bottom logos in the UI. The generator returns a solid color
+    adapted for high-contrast mode when requested.
     """
-    bg_color = (
-        COLORS.get("contrast_bg")
-        if high_contrast
-        else COLORS.get("background", "#FFD100")
-    )
+    bg_color = COLORS.get("contrast_bg") if high_contrast else COLORS.get("background", "#FFD100")
     width = max(2, int(width))
     height = max(2, int(height))
-    base = Image.new("RGB", (width, height), bg_color).convert("RGBA")
-
-    # Previously a faint Prosegur globe was composited into the background.
-    # This function now returns a plain background color without additional
-    # decorative imagery so branding is handled by the explicit right-bottom
-    # logo placed in the UI instead.
-    return base.convert("RGB")
+    base = Image.new("RGB", (width, height), bg_color)
+    return base
 
 
 def _hex_to_rgba(hex_color: str, alpha: int = 255) -> Tuple[int, int, int, int]:
@@ -103,7 +85,8 @@ def _hex_to_rgba(hex_color: str, alpha: int = 255) -> Tuple[int, int, int, int]:
     r = int(hex_color[0:2], 16)
     g = int(hex_color[2:4], 16)
     b = int(hex_color[4:6], 16)
-    return (r, g, b, int(alpha))
+    a = max(0, min(255, int(alpha)))
+    return (r, g, b, a)
 
 
 # Draw a small globe icon used in the footer.
@@ -116,23 +99,18 @@ def generate_globe_icon(
     radius = diameter // 2 - 2
     cx = cy = diameter // 2
     stroke = stroke_color
-    draw.ellipse(
-        (cx - radius, cy - radius, cx + radius, cy + radius), outline=stroke, width=3
-    )
+    draw.ellipse((cx - radius, cy - radius, cx + radius, cy + radius), outline=stroke, width=3)
+
     # Draw globe longitude lines
     for offset in (-0.45, 0, 0.45):
         ox = int(radius * offset)
-        draw.ellipse(
-            (cx - ox - radius, cy - radius, cx - ox + radius, cy + radius),
-            outline=stroke,
-            width=1,
-        )
+        draw.ellipse((cx - ox - radius, cy - radius, cx - ox + radius, cy + radius), outline=stroke, width=1)
+
     # Draw globe latitude lines
     for frac in (-0.5, 0, 0.5):
         ry = int(radius * (0.65 + 0.25 * frac))
-        draw.ellipse(
-            (cx - radius, cy - ry, cx + radius, cy + ry), outline=stroke, width=1
-        )
+        draw.ellipse((cx - radius, cy - ry, cx + radius, cy + ry), outline=stroke, width=1)
+
     draw.line([(cx - radius, cy), (cx + radius, cy)], fill=stroke, width=2)
     return img
 
@@ -143,8 +121,8 @@ class Tooltip:
         # Save state and bind enter/leave events.
         self.widget = widget
         self.text_func = text_func
-        self.delay = delay
-        self._id: Optional[str] = None
+        self.delay = int(delay)
+        self._id: Optional[int] = None
         self.tip: Optional[tk.Toplevel] = None
         widget.bind("<Enter>", self._schedule)
         widget.bind("<Leave>", self._hide_now)
@@ -152,7 +130,15 @@ class Tooltip:
     # Schedule tooltip display after delay.
     def _schedule(self, _event: tk.Event) -> None:
         self._cancel()
-        self._id = self.widget.after(self.delay, self._show)
+        try:
+            self._id = int(self.widget.after(self.delay, self._show))
+        except Exception:
+            # some backends return string ids; ignore casting failures
+            self._id = None
+            try:
+                self.widget.after(self.delay, self._show)
+            except Exception:
+                pass
 
     # Cancel a scheduled tooltip show.
     def _cancel(self) -> None:
@@ -171,11 +157,7 @@ class Tooltip:
         if not text:
             return
         try:
-            x, y, cx, cy = (
-                self.widget.bbox("insert")
-                if hasattr(self.widget, "bbox")
-                else (0, 0, 0, 0)
-            )
+            x, y, cx, cy = self.widget.bbox("insert") if hasattr(self.widget, "bbox") else (0, 0, 0, 0)
         except Exception:
             x, y, cx, cy = 0, 0, 0, 0
         x += self.widget.winfo_rootx() + 20
@@ -185,9 +167,7 @@ class Tooltip:
         self.tip.wm_geometry(f"+{x}+{y}")
         frame = tk.Frame(self.tip, bg="#ffffff", bd=1, relief="solid")
         frame.pack(fill="both", expand=True)
-        tk.Label(
-            frame, text=text, bg="#ffffff", fg="#000000", font=("Segoe UI", 9)
-        ).pack(padx=4, pady=2)
+        tk.Label(frame, text=text, bg="#ffffff", fg="#000000", font=("Segoe UI", 9)).pack(padx=4, pady=2)
 
     # Hide and destroy the tooltip immediately.
     def _hide_now(self, _event: tk.Event) -> None:
@@ -205,7 +185,6 @@ _InternalTooltip = Tooltip
 
 # Main application window.
 class CoinScanApp(tk.Tk):
-
     def __init__(self) -> None:
         super().__init__()
         # Load and apply saved settings.
@@ -221,7 +200,6 @@ class CoinScanApp(tk.Tk):
         self.title(f"CoinScan v{VERSION}")
 
         # Make the initial main window larger than the default SIZES['window'].
-        # Use a reasonable minimum to avoid too-small windows on small displays.
         initial_w = max(1024, int(SIZES.get("window", (1024, 768))[0] * 1.25))
         initial_h = max(800, int(SIZES.get("window", (1024, 768))[1] * 1.25))
         self.geometry(f"{initial_w}x{initial_h}")
@@ -240,31 +218,23 @@ class CoinScanApp(tk.Tk):
 
     # Create and arrange all widgets.
     def create_widgets(self) -> None:
-
         # Top bar with logo and controls
         self.top_bar = tk.Frame(self, bg=COLORS["topbar_bg"], height=48)
         self.top_bar.pack(side="top", fill="x")
 
         self.logo_photo = load_logo_photo()
         if self.logo_photo is not None:
-            self.logo_label = tk.Label(
-                self.top_bar, image=self.logo_photo, bg=COLORS["topbar_bg"]
-            )
-            self.logo_label.pack(side="left", padx=(0, 0))
+            self.logo_label = tk.Label(self.top_bar, image=self.logo_photo, bg=COLORS["topbar_bg"])
+            self.logo_label.pack(side="left")
         else:
             # Text fallback for the logo
             self.logo_label = tk.Label(
-                self.top_bar,
-                text="PROSEGUR",
-                font=("Segoe UI", 14, "bold"),
-                bg=COLORS["topbar_bg"],
+                self.top_bar, text="PROSEGUR", font=("Segoe UI", 14, "bold"), bg=COLORS["topbar_bg"]
             )
-            self.logo_label.pack(side="left", padx=(8, 0))
+            self.logo_label.pack(side="left", padx=8)
 
         # Title label in top bar
-        self.title_label = tk.Label(
-            self.top_bar, font=FONTS["title"], bg=COLORS["topbar_bg"]
-        )
+        self.title_label = tk.Label(self.top_bar, font=FONTS["title"], bg=COLORS["topbar_bg"])
         self.title_label.pack(side="left", padx=20)
 
         # Controls on the top-right (language flags, contrast)
@@ -275,20 +245,8 @@ class CoinScanApp(tk.Tk):
         self.flag_de = get_flag_img(ICON_PATHS["flag_de"])
         self.flag_en = get_flag_img(ICON_PATHS["flag_en"])
 
-        tk.Button(
-            topbar_controls,
-            image=self.flag_de,
-            bd=0,
-            bg=COLORS["topbar_bg"],
-            command=lambda: self.set_language("de"),
-        ).pack(side="left", padx=2)
-        tk.Button(
-            topbar_controls,
-            image=self.flag_en,
-            bd=0,
-            bg=COLORS["topbar_bg"],
-            command=lambda: self.set_language("en"),
-        ).pack(side="left", padx=2)
+        tk.Button(topbar_controls, image=self.flag_de, bd=0, bg=COLORS["topbar_bg"], command=lambda: self.set_language("de")).pack(side="left", padx=2)
+        tk.Button(topbar_controls, image=self.flag_en, bd=0, bg=COLORS["topbar_bg"], command=lambda: self.set_language("en")).pack(side="left", padx=2)
 
         tk.Frame(topbar_controls, width=32, bg=COLORS["topbar_bg"]).pack(side="left")
 
@@ -304,9 +262,7 @@ class CoinScanApp(tk.Tk):
         self.contrast_btn.pack(side="left", padx=8)
 
         # Sidebar with navigation buttons
-        self.sidebar = tk.Frame(
-            self, bg=COLORS["sidebar_bg"], width=SIZES["sidebar_width"]
-        )
+        self.sidebar = tk.Frame(self, bg=COLORS["sidebar_bg"], width=SIZES["sidebar_width"])
         self.sidebar.pack(side="left", fill="y")
         self.sidebar_buttons = []
 
@@ -324,28 +280,14 @@ class CoinScanApp(tk.Tk):
                 cmd = None
 
             btn = tk.Button(
-                self.sidebar,
-                text=icon,
-                font=FONTS["sidebar"],
-                bg=COLORS["sidebar_bg"],
-                fg=COLORS["sidebar_fg"],
-                bd=0,
-                relief="flat",
-                command=cmd,
+                self.sidebar, text=icon, font=FONTS["sidebar"], bg=COLORS["sidebar_bg"], fg=COLORS["sidebar_fg"], bd=0, relief="flat", command=cmd
             )
             btn.pack(pady=20)
             self.sidebar_buttons.append(btn)
 
         # Exit button at the bottom of sidebar
         exit_btn = tk.Button(
-            self.sidebar,
-            text=SIDEBAR_ICONS[3],
-            font=FONTS["sidebar"],
-            bg=COLORS["sidebar_bg"],
-            fg=COLORS["sidebar_fg"],
-            bd=0,
-            relief="flat",
-            command=self.confirm_exit,
+            self.sidebar, text=SIDEBAR_ICONS[3], font=FONTS["sidebar"], bg=COLORS["sidebar_bg"], fg=COLORS["sidebar_fg"], bd=0, relief="flat", command=self.confirm_exit
         )
         exit_btn.pack(side="bottom", pady=20)
         self.sidebar_buttons.append(exit_btn)
@@ -362,10 +304,7 @@ class CoinScanApp(tk.Tk):
 
         # Re-render background when the main content is resized
         self.main_content.bind("<Configure>", self._on_main_content_resize)
-        self._render_background_image(
-            max(2, self.main_content.winfo_width()),
-            max(2, self.main_content.winfo_height()),
-        )
+        self._render_background_image(max(2, self.main_content.winfo_width()), max(2, self.main_content.winfo_height()))
 
         # Left panel: webcam and controls
         self.webcam_panel = tk.Frame(
@@ -380,23 +319,15 @@ class CoinScanApp(tk.Tk):
         self.webcam_panel.pack(side="left", padx=40, pady=40, fill="both", expand=True)
 
         # Label to show webcam image
-        self.webcam_label = tk.Label(
-            self.webcam_panel, bg=COLORS["background"], fg="#000000"
-        )
+        self.webcam_label = tk.Label(self.webcam_panel, bg=COLORS["background"], fg="#000000")
         self.webcam_label.pack(pady=(10, 6))
 
         # Branding logo placed at the right-bottom behind the webcam panel.
         # This is intentionally behind the webcam so it doesn't obstruct content.
         self.brand_right_photo: Optional[ImageTk.PhotoImage] = None
-        self.brand_right_label: Optional[tk.Label] = tk.Label(
-            self.main_content, bd=0, bg=COLORS["background"]
-        )
+        self.brand_right_label: Optional[tk.Label] = tk.Label(self.main_content, bd=0, bg=COLORS["background"])
         self.brand_right_label.place(
-            relx=1.0,
-            rely=1.0,
-            anchor="se",
-            x=-48,
-            y=-(SIZES.get("footer_height", 30) + 8),
+            relx=1.0, rely=1.0, anchor="se", x=-48, y=-(SIZES.get("footer_height", 30) + 8)
         )
 
         # Scan button starts recognition
@@ -405,9 +336,7 @@ class CoinScanApp(tk.Tk):
             font=FONTS["button"],
             bg=COLORS.get("primary_btn_bg", COLORS["button_bg"]),
             fg=COLORS["button_fg"],
-            activebackground=COLORS.get(
-                "primary_btn_hover", COLORS["button_active_bg"]
-            ),
+            activebackground=COLORS.get("primary_btn_hover", COLORS["button_active_bg"]),
             activeforeground=COLORS["button_active_fg"],
             relief="raised",
             bd=0,
@@ -420,25 +349,18 @@ class CoinScanApp(tk.Tk):
         # Font size controls
         self.font_frame = tk.Frame(self.webcam_panel, bg=COLORS["background"])
         self.font_frame.pack(pady=(0, 8))
-        self.fontsize_label = tk.Label(
-            self.font_frame,
-            text="Font size",
-            bg=COLORS["background"],
-            font=FONTS["button"],
-        )
+        self.fontsize_label = tk.Label(self.font_frame, text="Font size", bg=COLORS["background"], font=FONTS["button"])
         self.fontsize_label.pack(side="left", padx=(0, 10))
         font_group = tk.Frame(self.font_frame, bg=COLORS["background"])
         font_group.pack(side="left")
         # Modified button texts for better visibility and UX
         self.font_dec_btn = tk.Button(
             font_group,
-            text="-",
+            text="A-",
             font=FONTS["button"],
             bg=COLORS.get("primary_btn_bg", COLORS["button_bg"]),
             fg=COLORS["button_fg"],
-            activebackground=COLORS.get(
-                "primary_btn_hover", COLORS["button_active_bg"]
-            ),
+            activebackground=COLORS.get("primary_btn_hover", COLORS["button_active_bg"]),
             activeforeground=COLORS["button_active_fg"],
             bd=0,
             padx=10,
@@ -448,13 +370,11 @@ class CoinScanApp(tk.Tk):
         self.font_dec_btn.pack(side="left", padx=(0, 4))
         self.font_inc_btn = tk.Button(
             font_group,
-            text="+",
+            text="A+",
             font=FONTS["button"],
             bg=COLORS.get("primary_btn_bg", COLORS["button_bg"]),
             fg=COLORS["button_fg"],
-            activebackground=COLORS.get(
-                "font_btn_inc_hover", COLORS["button_active_bg"]
-            ),
+            activebackground=COLORS.get("font_btn_inc_hover", COLORS["button_active_bg"]),
             activeforeground=COLORS["button_active_fg"],
             bd=0,
             padx=10,
@@ -464,9 +384,7 @@ class CoinScanApp(tk.Tk):
         self.font_inc_btn.pack(side="left", padx=(4, 0))
 
         # Listbox showing recognition results
-        self.recognition_list = tk.Listbox(
-            self.webcam_panel, font=FONTS["listbox"], height=5, width=50
-        )
+        self.recognition_list = tk.Listbox(self.webcam_panel, font=FONTS["listbox"], height=5, width=50)
         self.recognition_list.pack(pady=(0, 8))
 
         # Internal model for detected coins to support manual post-processing.
@@ -477,48 +395,16 @@ class CoinScanApp(tk.Tk):
         self.edit_frame = tk.Frame(self.webcam_panel, bg=COLORS["background"])
         self.edit_frame.pack(pady=(0, 8))
 
-        self.add_btn = tk.Button(
-            self.edit_frame,
-            text="Add",
-            font=FONTS["button"],
-            command=self.add_coin,
-            bd=0,
-            padx=8,
-            pady=4,
-        )
+        self.add_btn = tk.Button(self.edit_frame, text="Add", font=FONTS["button"], command=self.add_coin, bd=0, padx=8, pady=4)
         self.add_btn.pack(side="left", padx=4)
 
-        self.edit_btn = tk.Button(
-            self.edit_frame,
-            text="Edit",
-            font=FONTS["button"],
-            command=self.edit_selected,
-            bd=0,
-            padx=8,
-            pady=4,
-        )
+        self.edit_btn = tk.Button(self.edit_frame, text="Edit", font=FONTS["button"], command=self.edit_selected, bd=0, padx=8, pady=4)
         self.edit_btn.pack(side="left", padx=4)
 
-        self.remove_btn = tk.Button(
-            self.edit_frame,
-            text="Remove",
-            font=FONTS["button"],
-            command=self.remove_selected,
-            bd=0,
-            padx=8,
-            pady=4,
-        )
+        self.remove_btn = tk.Button(self.edit_frame, text="Remove", font=FONTS["button"], command=self.remove_selected, bd=0, padx=8, pady=4)
         self.remove_btn.pack(side="left", padx=4)
 
-        self.total_btn = tk.Button(
-            self.edit_frame,
-            text="Total",
-            font=FONTS["button"],
-            command=self.show_total,
-            bd=0,
-            padx=8,
-            pady=4,
-        )
+        self.total_btn = tk.Button(self.edit_frame, text="Total", font=FONTS["button"], command=self.show_total, bd=0, padx=8, pady=4)
         self.total_btn.pack(side="left", padx=4)
 
         # Double-click to edit an entry for convenience
@@ -536,17 +422,10 @@ class CoinScanApp(tk.Tk):
         )
         self.results_panel.pack(side="right", padx=40, pady=40, fill="y")
 
-        self.results_label = tk.Label(
-            self.results_panel, font=FONTS["results"], bg=COLORS["background"]
-        )
+        self.results_label = tk.Label(self.results_panel, font=FONTS["results"], bg=COLORS["background"])
         self.results_label.pack(pady=(20, 10))
 
-        self.total_label = tk.Label(
-            self.results_panel,
-            font=FONTS["total"],
-            bg=COLORS["background"],
-            fg=COLORS["results_fg"],
-        )
+        self.total_label = tk.Label(self.results_panel, font=FONTS["total"], bg=COLORS["background"], fg=COLORS["results_fg"])
         self.total_label.pack(pady=(0, 10))
 
         # Footer with a small globe icon and copyright label
@@ -556,10 +435,7 @@ class CoinScanApp(tk.Tk):
         try:
             globe_img = generate_globe_icon(64)
             self.footer_globe_photo = ImageTk.PhotoImage(globe_img)
-            self.footer_globe_label = tk.Label(
-                self.footer, image=self.footer_globe_photo, bg=COLORS["footer_bg"]
-            )
-
+            self.footer_globe_label = tk.Label(self.footer, image=self.footer_globe_photo, bg=COLORS["footer_bg"])
             self.footer_globe_label.place(relx=1.0, rely=1.0, anchor="se", x=-16, y=-4)
         except Exception:
             self.footer_globe_label = None
@@ -577,7 +453,6 @@ class CoinScanApp(tk.Tk):
 
         # Apply size and font preferences
         self.set_size(self.current_size)
-
         self.adjust_font_size(0)
 
         # Helper to get tooltip text for a key
@@ -592,18 +467,14 @@ class CoinScanApp(tk.Tk):
             logger = logging.getLogger(__name__)
             logger.error("Tooltip symbol is not callable: %r", tooltip_obj)
             raise TypeError(
-                f"Tooltip symbol is not callable: {tooltip_obj!r}. "
-                "Possible name shadowing or import conflict. "
-                "Inspect where `Tooltip` is defined or overwritten."
+                f"Tooltip symbol is not callable: {tooltip_obj!r}. Possible name shadowing or import conflict."
             )
 
         # Attach tooltips to important controls
         _InternalTooltip(self.scan_btn, tt("scan_btn"))
         _InternalTooltip(self.contrast_btn, tt("contrast"))
 
-        for child, k in zip(
-            topbar_controls.winfo_children()[:2], ["flag_de", "flag_en"]
-        ):
+        for child, k in zip(topbar_controls.winfo_children()[:2], ["flag_de", "flag_en"]):
             Tooltip(child, tt(k))
         Tooltip(self.sidebar_buttons[0], tt("home"))
         Tooltip(self.sidebar_buttons[1], tt("settings"))
@@ -614,7 +485,6 @@ class CoinScanApp(tk.Tk):
 
     # Handle resizing of the main content (recreate background unless in high contrast).
     def _on_main_content_resize(self, event: tk.Event) -> None:
-
         # Always re-render the background image on resize. The generator decides
         # whether to produce a high-contrast background based on current state.
         self._render_background_image(max(2, event.width), max(2, event.height))
@@ -622,34 +492,25 @@ class CoinScanApp(tk.Tk):
     # Render and set the background image on the bg_label.
     def _render_background_image(self, width: int, height: int) -> None:
         try:
-            img = generate_prosegur_globe_bg(
-                width, height, getattr(self, "high_contrast", False)
-            )
+            img = generate_prosegur_globe_bg(width, height, getattr(self, "high_contrast", False))
             self._bg_image = ImageTk.PhotoImage(img)
             self.bg_label.config(image=self._bg_image)
-            # Place a branding logo behind the webcam at the right-bottom if the
-            # file `icon/logo-prosegur.png` (or a high-contrast alternative) is present.
+
+            # Update right-bottom branding image if present.
             try:
                 if getattr(self, "high_contrast", False):
-                    logo_path = HIGH_CONTRAST_LOGOS.get("prosegur") or os.path.join(
-                        os.path.dirname(__file__), "icon", "logo-prosegur.png"
-                    )
+                    logo_path = HIGH_CONTRAST_LOGOS.get("prosegur") or os.path.join(os.path.dirname(__file__), "icon", "logo-prosegur.png")
                 else:
-                    logo_path = os.path.join(
-                        os.path.dirname(__file__), "icon", "logo-prosegur.png"
-                    )
+                    logo_path = os.path.join(os.path.dirname(__file__), "icon", "logo-prosegur.png")
 
                 if logo_path and os.path.exists(logo_path):
                     with Image.open(logo_path) as lp:
                         lp = lp.convert("RGBA")
                         side_right = max(80, int(min(width, height) * 0.45))
                         lr = lp.resize((side_right, side_right), Image.LANCZOS).copy()
-                        alpha_factor = (
-                            0.95 if getattr(self, "high_contrast", False) else 0.20
-                        )
+                        alpha_factor = 0.95 if getattr(self, "high_contrast", False) else 0.20
                         la = lr.split()[-1].point(lambda v: int(v * alpha_factor))
                         if getattr(self, "high_contrast", False):
-                            # Make a white silhouette for high-contrast
                             white = Image.new("RGBA", lr.size, (255, 255, 255, 0))
                             white.putalpha(la)
                             lr = white
@@ -661,29 +522,16 @@ class CoinScanApp(tk.Tk):
                         try:
                             self.brand_right_label.config(
                                 image=self.brand_right_photo,
-                                bg=(
-                                    COLORS.get("contrast_panel_bg")
-                                    if getattr(self, "high_contrast", False)
-                                    else COLORS["background"]
-                                ),
+                                bg=(COLORS.get("contrast_panel_bg") if getattr(self, "high_contrast", False) else COLORS["background"]),
                             )
                         except Exception:
                             try:
-                                self.brand_right_label.config(
-                                    image=self.brand_right_photo
-                                )
+                                self.brand_right_label.config(image=self.brand_right_photo)
                             except Exception:
                                 pass
 
-                        # Place and ensure it's behind the webcam panel
                         try:
-                            self.brand_right_label.place(
-                                relx=1.0,
-                                rely=1.0,
-                                anchor="se",
-                                x=-48,
-                                y=-(SIZES.get("footer_height", 30) + 8),
-                            )
+                            self.brand_right_label.place(relx=1.0, rely=1.0, anchor="se", x=-48, y=-(SIZES.get("footer_height", 30) + 8))
                             self.brand_right_label.lower(self.webcam_panel)
                         except Exception:
                             pass
@@ -697,41 +545,35 @@ class CoinScanApp(tk.Tk):
                     self.brand_right_label.config(image="")
                 except Exception:
                     pass
-            # No additional compositing or branding on the background image.
-            # Background is set above and decorative globe elements have been removed.
         except Exception:
-            self.bg_label.config(image="/")
+            # If background rendering fails, clear image
+            try:
+                self.bg_label.config(image="")
+            except Exception:
+                pass
 
     # Change language and persist setting.
     def set_language(self, lang: str) -> None:
-
         self.current_lang = lang if lang in LANGUAGES else "en"
-
         self.settings["language"] = self.current_lang
         save_settings(self.settings)
-
         self.update_language()
         self.apply_contrast()
 
     # Set webcam size, persist and resize window accordingly.
     def set_size(self, size: Tuple[int, int]) -> None:
-
         self.current_size = size
-
         for key, val in SIZES.items():
             if val == size and key.startswith("webcam_"):
                 self.settings["webcam_size"] = key.replace("webcam_", "")
                 break
         else:
-
             self.settings["webcam_size"] = "small"
-
         save_settings(self.settings)
         self.resize_window_for_webcam()
 
     # Adjust all fonts by delta and update controls.
     def adjust_font_size(self, delta: int) -> None:
-
         from tkinter import font as tkfont
 
         MIN_SIZE = 8
@@ -784,52 +626,28 @@ class CoinScanApp(tk.Tk):
             disabled = size_now <= MIN_SIZE
             self.font_dec_btn.config(
                 state=("disabled" if disabled else "normal"),
-                bg=(
-                    COLORS.get("font_btn_disabled_bg")
-                    if disabled
-                    else COLORS.get("primary_btn_bg", COLORS["button_bg"])
-                ),
-                fg=(
-                    COLORS.get("font_btn_disabled_fg")
-                    if disabled
-                    else COLORS["button_fg"]
-                ),
-                activebackground=COLORS.get(
-                    "primary_btn_hover", COLORS["button_active_bg"]
-                ),
+                bg=(COLORS.get("font_btn_disabled_bg") if disabled else COLORS.get("primary_btn_bg", COLORS["button_bg"])),
+                fg=(COLORS.get("font_btn_disabled_fg") if disabled else COLORS["button_fg"]),
+                activebackground=COLORS.get("primary_btn_hover", COLORS["button_active_bg"]),
             )
         if hasattr(self, "font_inc_btn"):
             disabled = size_now >= MAX_SIZE
             self.font_inc_btn.config(
                 state=("disabled" if disabled else "normal"),
-                bg=(
-                    COLORS.get("font_btn_disabled_bg")
-                    if disabled
-                    else COLORS.get("primary_btn_bg", COLORS["button_bg"])
-                ),
-                fg=(
-                    COLORS.get("font_btn_disabled_fg")
-                    if disabled
-                    else COLORS["button_fg"]
-                ),
-                activebackground=COLORS.get(
-                    "primary_btn_hover", COLORS["button_active_bg"]
-                ),
+                bg=(COLORS.get("font_btn_disabled_bg") if disabled else COLORS.get("primary_btn_bg", COLORS["button_bg"])),
+                fg=(COLORS.get("font_btn_disabled_fg") if disabled else COLORS["button_fg"]),
+                activebackground=COLORS.get("primary_btn_hover", COLORS["button_active_bg"]),
             )
 
     # Toggle high-contrast mode and persist.
     def toggle_contrast(self) -> None:
-
         self.high_contrast = not self.high_contrast
-
         self.settings["high_contrast"] = self.high_contrast
         save_settings(self.settings)
-
         self.apply_contrast()
 
     # Apply color scheme depending on high_contrast flag.
     def apply_contrast(self) -> None:
-
         if self.high_contrast:
             bg_main = COLORS["contrast_bg"]
             fg_panel = COLORS["contrast_fg"]
@@ -857,55 +675,42 @@ class CoinScanApp(tk.Tk):
         self.configure(bg=bg_main)
         self.top_bar.config(bg=COLORS["topbar_bg"])
         self.title_label.config(bg=COLORS["topbar_bg"], fg="#000000")
+
         # Update top-bar logo for high-contrast: use a white silhouette when enabled
         try:
             if getattr(self, "high_contrast", False):
                 top_logo_path = (
                     HIGH_CONTRAST_LOGOS.get("prosegur")
                     or ICON_PATHS.get("prosegur")
-                    or os.path.join(
-                        os.path.dirname(__file__), "icon", "logo-prosegur.png"
-                    )
+                    or os.path.join(os.path.dirname(__file__), "icon", "logo-prosegur.png")
                 )
                 if top_logo_path and os.path.exists(top_logo_path):
                     with Image.open(top_logo_path) as li:
-                        size = (
-                            SIZES.get("logo_width", 50),
-                            SIZES.get("logo_width", 50),
-                        )
+                        size = (SIZES.get("logo_width", 50), SIZES.get("logo_width", 50))
                         iml = li.convert("RGBA").resize(size, Image.LANCZOS)
-                        # create white silhouette preserving alpha
                         a = iml.split()[-1].point(lambda v: int(v * 0.95))
                         white = Image.new("RGBA", iml.size, (255, 255, 255, 0))
                         white.putalpha(a)
                         self.logo_photo = ImageTk.PhotoImage(white.copy())
-                        self.logo_label.config(
-                            image=self.logo_photo, bg=COLORS["topbar_bg"]
-                        )
+                        self.logo_label.config(image=self.logo_photo, bg=COLORS["topbar_bg"])
                 else:
-                    # fallback: just set bg
                     self.logo_label.config(bg=COLORS["topbar_bg"])
             else:
-                # restore standard logo
                 try:
                     self.logo_photo = load_logo_photo()
                     if self.logo_photo is not None:
-                        self.logo_label.config(
-                            image=self.logo_photo, bg=COLORS["topbar_bg"]
-                        )
+                        self.logo_label.config(image=self.logo_photo, bg=COLORS["topbar_bg"])
                     else:
                         self.logo_label.config(bg=COLORS["topbar_bg"])
                 except Exception:
                     self.logo_label.config(bg=COLORS["topbar_bg"])
         except Exception:
-            # Ensure at least the background is updated
             try:
                 self.logo_label.config(bg=COLORS["topbar_bg"])
             except Exception:
                 pass
-        self.contrast_btn.config(
-            bg=COLORS["topbar_bg"], fg="#000000", text=contrast_icon
-        )
+
+        self.contrast_btn.config(bg=COLORS["topbar_bg"], fg="#000000", text=contrast_icon)
 
         self.sidebar.config(bg=sidebar_bg)
         for btn in self.sidebar_buttons:
@@ -930,17 +735,11 @@ class CoinScanApp(tk.Tk):
             activeforeground=btn_fg,
         )
 
-        # Adjust A- / A+ buttons' font for high-contrast accessibility and
-        # restore standard font when not in high-contrast.
+        # Adjust A- / A+ buttons' font for high-contrast accessibility and restore standard font when not in high-contrast.
         try:
             if hasattr(self, "font_dec_btn") and hasattr(self, "font_inc_btn"):
                 base_font = FONTS.get("button", ("Segoe UI", 14, "bold"))
-                if (
-                    isinstance(base_font, (tuple, list))
-                    and len(base_font) >= 2
-                    and isinstance(base_font[1], int)
-                ):
-                    # Increase size for high-contrast to improve legibility
+                if isinstance(base_font, (tuple, list)) and len(base_font) >= 2 and isinstance(base_font[1], int):
                     hc_font = (base_font[0], min(base_font[1] + 4, 40), "bold")
                 else:
                     hc_font = base_font
@@ -957,19 +756,11 @@ class CoinScanApp(tk.Tk):
                 else:
                     std_font = FONTS.get("button")
                     try:
-                        self.font_dec_btn.config(
-                            font=std_font,
-                            bg=COLORS.get("primary_btn_bg", COLORS["button_bg"]),
-                            fg=COLORS.get("button_fg", "#FFFFFF"),
-                        )
+                        self.font_dec_btn.config(font=std_font, bg=COLORS.get("primary_btn_bg", COLORS["button_bg"]), fg=COLORS.get("button_fg", "#FFFFFF"))
                     except Exception:
                         pass
                     try:
-                        self.font_inc_btn.config(
-                            font=std_font,
-                            bg=COLORS.get("primary_btn_bg", COLORS["button_bg"]),
-                            fg=COLORS.get("button_fg", "#FFFFFF"),
-                        )
+                        self.font_inc_btn.config(font=std_font, bg=COLORS.get("primary_btn_bg", COLORS["button_bg"]), fg=COLORS.get("button_fg", "#FFFFFF"))
                     except Exception:
                         pass
         except Exception:
@@ -983,75 +774,49 @@ class CoinScanApp(tk.Tk):
             highlightbackground=border_color,
             highlightcolor=border_color,
         )
+
         if self.high_contrast:
             # Adjust panels for high-contrast theme
             self.results_label.config(bg=COLORS["contrast_panel_bg"], fg=fg_panel)
             self.total_label.config(bg=COLORS["contrast_panel_bg"], fg=fg_panel)
             self.footer.config(bg=COLORS["contrast_panel_bg"])
-            # Make footer copyright text high-contrast as well
             try:
-                self.footer_label.config(
-                    bg=COLORS["contrast_panel_bg"],
-                    fg=COLORS.get("contrast_fg", "#FFFF00"),
-                )
+                self.footer_label.config(bg=COLORS["contrast_panel_bg"], fg=COLORS.get("contrast_fg", "#FFFF00"))
             except Exception:
                 pass
+
             # Ensure any branding/logo is visible in high-contrast
             try:
-                # Compute a reasonable size based on current main content.
                 w = max(2, self.main_content.winfo_width())
                 h = max(2, self.main_content.winfo_height())
                 side_right = max(96, int(min(w, h) * 0.60))
 
-                # Prefer an explicitly supplied high-contrast logo, fall back
-                # to the standard `logo-prosegur.png` in the icon folder.
                 hc_logo_path = (
                     HIGH_CONTRAST_LOGOS.get("prosegur")
                     or ICON_PATHS.get("prosegur")
-                    or os.path.join(
-                        os.path.dirname(__file__), "icon", "logo-prosegur.png"
-                    )
+                    or os.path.join(os.path.dirname(__file__), "icon", "logo-prosegur.png")
                 )
 
                 if hc_logo_path and os.path.exists(hc_logo_path):
                     with Image.open(hc_logo_path) as im:
-                        img = im.convert("RGBA").resize(
-                            (side_right, side_right), Image.LANCZOS
-                        )
-                        # Use strong alpha in high-contrast so the logo reads clearly
-                        # and convert it to a white silhouette for maximum contrast.
+                        img = im.convert("RGBA").resize((side_right, side_right), Image.LANCZOS)
                         a = img.split()[-1].point(lambda v: int(v * 0.95))
                         white = Image.new("RGBA", img.size, (255, 255, 255, 0))
                         white.putalpha(a)
-                        self.prosegur_globe_right_photo = ImageTk.PhotoImage(
-                            white.copy()
-                        )
+                        self.prosegur_globe_right_photo = ImageTk.PhotoImage(white.copy())
                         try:
-                            self.prosegur_globe_right_label.config(
-                                bg=COLORS["contrast_panel_bg"],
-                                image=self.prosegur_globe_right_photo,
-                            )
+                            self.prosegur_globe_right_label.config(bg=COLORS["contrast_panel_bg"], image=self.prosegur_globe_right_photo)
                         except Exception:
                             try:
-                                self.prosegur_globe_right_label.config(
-                                    image=self.prosegur_globe_right_photo
-                                )
+                                self.prosegur_globe_right_label.config(image=self.prosegur_globe_right_photo)
                             except Exception:
                                 pass
-                        # Place and ensure it stays behind the webcam panel
                         try:
-                            self.prosegur_globe_right_label.place(
-                                relx=1.0,
-                                rely=1.0,
-                                anchor="se",
-                                x=-48,
-                                y=-(SIZES.get("footer_height", 30) + 8),
-                            )
+                            self.prosegur_globe_right_label.place(relx=1.0, rely=1.0, anchor="se", x=-48, y=-(SIZES.get("footer_height", 30) + 8))
                             self.prosegur_globe_right_label.lower(self.webcam_panel)
                         except Exception:
                             pass
                 else:
-                    # If no file, clear the label
                     try:
                         self.prosegur_globe_right_label.config(image="")
                     except Exception:
@@ -1066,25 +831,20 @@ class CoinScanApp(tk.Tk):
             self.results_label.config(bg=COLORS["background"], fg=fg_panel)
             self.total_label.config(bg=COLORS["background"], fg=fg_panel)
             self.footer.config(bg=COLORS["footer_bg"])
-            # Restore footer copyright color
             try:
-                self.footer_label.config(
-                    bg=COLORS["footer_bg"], fg=COLORS.get("footer_fg", "#000000")
-                )
+                self.footer_label.config(bg=COLORS["footer_bg"], fg=COLORS.get("footer_fg", "#000000"))
             except Exception:
                 pass
+
             # Also regenerate the right-bottom globe for normal theme
             try:
                 w = max(2, self.main_content.winfo_width())
                 h = max(2, self.main_content.winfo_height())
-                # Match the larger branding size used when rendering the logo
                 side_right = max(96, int(min(w, h) * 0.60))
                 globe_right_img = generate_globe_icon(side_right)
                 self.prosegur_globe_right_photo = ImageTk.PhotoImage(globe_right_img)
                 try:
-                    self.prosegur_globe_right_label.config(
-                        bg=COLORS["background"], image=self.prosegur_globe_right_photo
-                    )
+                    self.prosegur_globe_right_label.config(bg=COLORS["background"], image=self.prosegur_globe_right_photo)
                     try:
                         self.prosegur_globe_right_label.lower(self.webcam_panel)
                     except Exception:
@@ -1099,7 +859,6 @@ class CoinScanApp(tk.Tk):
 
     # Update visible strings for the current language.
     def update_language(self) -> None:
-
         strings = LANGUAGES.get(self.current_lang, LANGUAGES["en"])
         self.title_label.config(text=strings.get("title", "CoinScan"))
         self.scan_btn.config(text=strings.get("scan", "Scan"))
@@ -1107,20 +866,17 @@ class CoinScanApp(tk.Tk):
         self.total_label.config(text=strings.get("total", "TOTAL: €0.00"))
 
         # Re-populate the listbox from the internal model so values are preserved
-        # when the language changes. If the recognition_list hasn't been created yet
-        # (e.g. called early during init), skip safely.
+        # when the language changes.
         if hasattr(self, "recognition_list") and hasattr(self, "detected_coins"):
             self.update_recognition_list()
 
     # Resize the main window to fit chosen webcam size (unless fullscreen).
     def resize_window_for_webcam(self) -> None:
-
         if getattr(self, "fullscreen", False):
             return
 
         self.update_idletasks()
 
-        # Increase margins and minimums so resized window is larger by default.
         results_w = max(self.results_panel.winfo_reqwidth(), 360)
         margin = 60
         width = SIZES["sidebar_width"] + margin + self.current_size[0] + margin + results_w + margin
@@ -1130,7 +886,6 @@ class CoinScanApp(tk.Tk):
 
     # Start the recognition process (delegates to webcam_stream).
     def start_recognition(self) -> None:
-
         update_recognition(
             self.scan_btn,
             self.recognition_list,
@@ -1146,32 +901,26 @@ class CoinScanApp(tk.Tk):
 
         results: list of tuples where the first element is value.
         Any additional fields (label, colour, radius, hue) are ignored by the UI model.
-        This runs on the Tk main thread.
         """
+        new_coins = []
         try:
-            # Parse incoming results into normalized dicts with only value
-            new_coins = []
             for r in results:
                 try:
                     value = float(r[0])
                 except Exception:
-                    # skip invalid entries
                     continue
                 new_coins.append({"value": value})
         except Exception:
             new_coins = []
 
-        # Append new detections to the existing list so rescans accumulate.
-        # Avoid exact-duplicate entries to reduce accidental double-counting.
+        # Append new detections avoiding exact duplicates.
         try:
             for coin in new_coins:
                 if coin not in self.detected_coins:
                     self.detected_coins.append(coin)
         except Exception:
-            # Fallback: if appending fails, replace the list to keep UI consistent
             self.detected_coins = new_coins
 
-        # Update UI list and totals
         self.update_recognition_list()
 
     # Show About dialog with version and description.
@@ -1181,32 +930,10 @@ class CoinScanApp(tk.Tk):
         about_win.title(strings.get("about", "About CoinScan"))
         about_win.resizable(False, False)
         about_win.configure(bg=COLORS["background"])
-        tk.Label(
-            about_win,
-            text=strings.get("about", "About CoinScan"),
-            font=FONTS["about_title"],
-            bg=COLORS["background"],
-        ).pack(padx=20, pady=(20, 5))
-        tk.Label(
-            about_win,
-            text=f"Version: {VERSION}",
-            font=FONTS["version"],
-            bg=COLORS["background"],
-            fg=COLORS["sidebar_bg"],
-        ).pack(padx=20, pady=(0, 10))
-        tk.Message(
-            about_win,
-            text=ABOUT_TEXTS.get(self.current_lang, ABOUT_TEXTS["en"]),
-            font=FONTS["about_text"],
-            bg=COLORS["background"],
-            width=400,
-        ).pack(padx=20, pady=(0, 20))
-        tk.Button(
-            about_win,
-            text=strings.get("close", "Close"),
-            command=about_win.destroy,
-            font=FONTS["about_button"],
-        ).pack(pady=(0, 20))
+        tk.Label(about_win, text=strings.get("about", "About CoinScan"), font=FONTS["about_title"], bg=COLORS["background"]).pack(padx=20, pady=(20, 5))
+        tk.Label(about_win, text=f"Version: {VERSION}", font=FONTS["version"], bg=COLORS["background"], fg=COLORS["sidebar_bg"]).pack(padx=20, pady=(0, 10))
+        tk.Message(about_win, text=ABOUT_TEXTS.get(self.current_lang, ABOUT_TEXTS["en"]), font=FONTS["about_text"], bg=COLORS["background"], width=400).pack(padx=20, pady=(0, 20))
+        tk.Button(about_win, text=strings.get("close", "Close"), command=about_win.destroy, font=FONTS["about_button"]).pack(pady=(0, 20))
 
     # Show (placeholder) settings dialog.
     def show_settings(self) -> None:
@@ -1215,30 +942,13 @@ class CoinScanApp(tk.Tk):
         settings_win.title(strings.get("settings", "Settings"))
         settings_win.resizable(False, False)
         settings_win.configure(bg=COLORS["background"])
-        tk.Label(
-            settings_win,
-            text=strings.get("settings", "Settings"),
-            font=FONTS["about_title"],
-            bg=COLORS["background"],
-        ).pack(padx=20, pady=(20, 10))
-        tk.Label(
-            settings_win,
-            text="(Settings options go here)",
-            font=FONTS["about_text"],
-            bg=COLORS["background"],
-        ).pack(padx=20, pady=(0, 20))
-        tk.Button(
-            settings_win,
-            text=strings.get("close", "Close"),
-            command=settings_win.destroy,
-            font=FONTS["about_button"],
-        ).pack(pady=(0, 20))
+        tk.Label(settings_win, text=strings.get("settings", "Settings"), font=FONTS["about_title"], bg=COLORS["background"]).pack(padx=20, pady=(20, 10))
+        tk.Label(settings_win, text="(Settings options go here)", font=FONTS["about_text"], bg=COLORS["background"]).pack(padx=20, pady=(0, 20))
+        tk.Button(settings_win, text=strings.get("close", "Close"), command=settings_win.destroy, font=FONTS["about_button"]).pack(pady=(0, 20))
 
     # Confirm exit with the user and quit if accepted.
     def confirm_exit(self) -> None:
-        confirm_text = LANGUAGES.get(self.current_lang, LANGUAGES["en"]).get(
-            "exit_confirm", "Are you sure you want to exit CoinScan?"
-        )
+        confirm_text = LANGUAGES.get(self.current_lang, LANGUAGES["en"]).get("exit_confirm", "Are you sure you want to exit CoinScan?")
         if messagebox.askokcancel("Exit", confirm_text):
             self.quit()
 
@@ -1251,12 +961,10 @@ class CoinScanApp(tk.Tk):
 
     # Set fullscreen state (attempt native fullscreen, fallback to maximized).
     def set_fullscreen(self, enable: bool = True) -> None:
-
         self.fullscreen = bool(enable)
         try:
             self.attributes("-fullscreen", self.fullscreen)
         except Exception:
-
             self.state("zoomed" if self.fullscreen else "normal")
 
     # Toggle fullscreen mode.
@@ -1269,21 +977,15 @@ class CoinScanApp(tk.Tk):
 
     # Add a new coin entry (show a dialog to enter details).
     def add_coin(self) -> None:
-
         dlg = CoinEditDialog(self)
         result = dlg.show()
 
         if result and isinstance(result, dict):
-            # Ensure value is float
             try:
                 result["value"] = float(result["value"])
-            except ValueError:
+            except Exception:
                 result["value"] = 0.0
-
-            # Add to internal model
             self.detected_coins.append(result)
-
-            # Update recognition list display
             self.update_recognition_list()
 
     # Edit the currently selected coin entry in the list.
@@ -1300,16 +1002,11 @@ class CoinScanApp(tk.Tk):
             result = dlg.show()
 
             if result and isinstance(result, dict):
-                # Ensure value is float
                 try:
                     result["value"] = float(result["value"])
-                except ValueError:
+                except Exception:
                     result["value"] = 0.0
-
-                # Update internal model
                 self.detected_coins[index] = result
-
-                # Update recognition list display
                 self.update_recognition_list()
         except Exception:
             pass
@@ -1320,21 +1017,15 @@ class CoinScanApp(tk.Tk):
             selection = self.recognition_list.curselection()
             if not selection:
                 return
-
             index = selection[0]
-
-            # Remove from internal model
             del self.detected_coins[index]
-
-            # Update recognition list display
             self.update_recognition_list()
         except Exception:
             pass
 
     def get_total_value(self) -> float:
         """Return the total value of detected coins as a float.
-        Convert each entry safely and ignore invalid values instead of failing
-        the whole sum.
+        Convert each entry safely and ignore invalid values.
         """
         total = 0.0
         for coin in getattr(self, "detected_coins", []):
@@ -1342,7 +1033,6 @@ class CoinScanApp(tk.Tk):
             try:
                 total += float(v)
             except Exception:
-                # ignore malformed / non-numeric entries
                 continue
         return total
 
@@ -1354,8 +1044,6 @@ class CoinScanApp(tk.Tk):
     def update_recognition_list(self) -> None:
         try:
             self.recognition_list.delete(0, "end")
-
-            # Add all detected coins to the listbox, format values safely
             for coin in self.detected_coins:
                 try:
                     value = float(coin.get("value", 0))
@@ -1364,7 +1052,6 @@ class CoinScanApp(tk.Tk):
                 label = f"€{value:.2f}"
                 self.recognition_list.insert("end", label)
 
-            # Update total label using the centralized accessor
             total_value = self.get_total_value()
             self.total_label.config(text=f"TOTAL: €{total_value:.2f}")
         except Exception:
@@ -1398,33 +1085,20 @@ class CoinEditDialog:
             y = py + max(0, (ph - dlg_h) // 2)
             self.win.geometry(f"{dlg_w}x{dlg_h}+{x}+{y}")
         except Exception:
-            # Fallback to fixed size if centering fails
             self.win.geometry(f"{dlg_w}x{dlg_h}")
 
         self.win.resizable(False, False)
 
         # Coin details form
         self.form_frame = tk.Frame(self.win, bg=COLORS["background"])
-        # Allow the form to expand to use the larger dialog area
         self.form_frame.pack(padx=20, pady=16, fill="both", expand=True)
 
-        tk.Label(
-            self.form_frame,
-            text="Value (in €):",
-            bg=COLORS["background"],
-            fg="#000000",
-            font=("Segoe UI", 10),
-        ).grid(row=0, column=0, sticky="w", pady=(0, 10), padx=(0, 6))
+        tk.Label(self.form_frame, text="Value (in €):", bg=COLORS["background"], fg="#000000", font=("Segoe UI", 10)).grid(
+            row=0, column=0, sticky="w", pady=(0, 10), padx=(0, 6)
+        )
 
         # Wider entry to match larger dialog
-        self.value_entry = tk.Entry(
-            self.form_frame,
-            font=("Segoe UI", 12),
-            fg="#000000",
-            bd=1,
-            relief="solid",
-            width=28,
-        )
+        self.value_entry = tk.Entry(self.form_frame, font=("Segoe UI", 12), fg="#000000", bd=1, relief="solid", width=28)
         self.value_entry.grid(row=0, column=1, pady=(0, 10), sticky="w")
 
         # Buttons placed in a frame at the bottom-right for better layout
@@ -1438,9 +1112,7 @@ class CoinEditDialog:
             font=FONTS["button"],
             bg=COLORS.get("primary_btn_bg", COLORS["button_bg"]),
             fg=COLORS["button_fg"],
-            activebackground=COLORS.get(
-                "primary_btn_hover", COLORS["button_active_bg"]
-            ),
+            activebackground=COLORS.get("primary_btn_hover", COLORS["button_active_bg"]),
             activeforeground=COLORS["button_active_fg"],
             bd=0,
             padx=18,
@@ -1476,18 +1148,10 @@ class CoinEditDialog:
     def on_ok(self) -> None:
         try:
             value = float(self.value_entry.get())
-
-            self.result = {
-                "value": value,
-            }
-
+            self.result = {"value": value}
             self.win.destroy()
         except ValueError:
-            messagebox.showerror(
-                "Invalid input",
-                "Please enter valid values for all fields.",
-                parent=self.win,
-            )
+            messagebox.showerror("Invalid input", "Please enter valid values for all fields.", parent=self.win)
 
     # Handle Cancel button press: do not save any data.
     def on_cancel(self) -> None:
@@ -1495,11 +1159,11 @@ class CoinEditDialog:
 
 
 if __name__ == "__main__":
-
     app = CoinScanApp()
     app.mainloop()
 
 
+# Small helper used by any external callers that need to sum detected coins.
 def sum_detected_coins(detected_coins: list[dict]) -> float:
     total = 0.0
     for coin in detected_coins:

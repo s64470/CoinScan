@@ -1,13 +1,15 @@
-﻿from __future__ import annotations
-from typing import Any, Dict, Optional
+﻿from typing import Any, Dict, Optional
 from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
 
 """
 language.py
 
-Provides localized strings and formatting helpers for the CoinScan UI.
-Includes language data for English and German, helper functions to
-select the correct language, retrieve UI strings/tooltips, and format totals.
+Localized strings and formatting helpers for the CoinScan UI.
+
+Changes:
+- Small API helpers added: `get_tooltip`.
+- Improved robustness for language lookup and Decimal handling.
+- Minor refactor for clarity and constants.
 """
 
 # Default fallback language code
@@ -106,6 +108,8 @@ ABOUT_TEXTS: Dict[str, str] = {
     ),
 }
 
+_DECIMAL_QUANT = Decimal("0.01")
+
 
 def normalize_lang(lang: Optional[str]) -> str:
     """
@@ -117,20 +121,19 @@ def normalize_lang(lang: Optional[str]) -> str:
 
     Returns DEFAULT_LANG when input is falsy or not supported.
     """
-    if not lang:
+    if not lang or not isinstance(lang, str):
         return DEFAULT_LANG
 
-    # Extract primary language subtag and lower-case it.
     primary = lang.split("-", 1)[0].split("_", 1)[0].lower()
-    # Return primary when supported; otherwise use default.
     return primary if primary in LANGUAGES else DEFAULT_LANG
 
 
 def get_strings(lang: Optional[str]) -> Dict[str, Any]:
     """
     Return the strings dictionary for the normalized language.
+    Always returns a dict (fallback to DEFAULT_LANG).
     """
-    return LANGUAGES[normalize_lang(lang)]
+    return LANGUAGES.get(normalize_lang(lang), LANGUAGES[DEFAULT_LANG])
 
 
 def get_text(lang: Optional[str], key: str, default: str = "") -> str:
@@ -143,10 +146,22 @@ def get_text(lang: Optional[str], key: str, default: str = "") -> str:
 
 def get_tooltip(lang: Optional[str], key: str, default: str = "") -> str:
     """
-    Retrieve a tooltip string by key from the nested "tooltips" map.
-    Returns default if key or tooltips map is missing.
+    Retrieve a tooltip string from the nested 'tooltips' dictionary.
     """
     return get_strings(lang).get("tooltips", {}).get(key, default)
+
+
+def _to_decimal(amount: Any) -> Decimal:
+    """
+    Safely convert input to a Decimal rounded to two decimal places.
+    Falls back to Decimal('0.00') for invalid inputs.
+    """
+    try:
+        # Use str(amount) to avoid float precision issues when a float is passed.
+        d = Decimal(str(amount))
+        return d.quantize(_DECIMAL_QUANT, rounding=ROUND_HALF_UP)
+    except (InvalidOperation, ValueError, TypeError):
+        return Decimal("0.00")
 
 
 def format_total(lang: Optional[str], amount: Any) -> str:
@@ -161,19 +176,10 @@ def format_total(lang: Optional[str], amount: Any) -> str:
     strings = get_strings(lang)
     fmt = strings.get("total_fmt", "TOTAL: €{amount}")
 
-    try:
-        # Convert to Decimal safely and round to 2 decimal places.
-        amt = Decimal(str(amount)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    except (InvalidOperation, ValueError):
-        # Fallback to zero on parse/round errors.
-        amt = Decimal("0.00")
-
-    # Create a fixed two-decimal string.
+    amt = _to_decimal(amount)
     amt_str = format(amt, "0.2f")
 
-    # Replace decimal point with comma for German formatting.
     if normalize_lang(lang) == "de":
         amt_str = amt_str.replace(".", ",")
 
-    # Inject into the language-specific format string.
     return fmt.format(amount=amt_str)
