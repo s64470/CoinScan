@@ -219,7 +219,13 @@ class CoinScanApp(tk.Tk):
 
         # Window setup
         self.title(f"CoinScan v{VERSION}")
-        self.geometry(f"{SIZES['window'][0]}x{SIZES['window'][1]}")
+
+        # Make the initial main window larger than the default SIZES['window'].
+        # Use a reasonable minimum to avoid too-small windows on small displays.
+        initial_w = max(1024, int(SIZES.get("window", (1024, 768))[0] * 1.25))
+        initial_h = max(800, int(SIZES.get("window", (1024, 768))[1] * 1.25))
+        self.geometry(f"{initial_w}x{initial_h}")
+
         self.update_idletasks()
         self.configure(bg=COLORS["background"])
         self.resizable(False, False)
@@ -423,9 +429,10 @@ class CoinScanApp(tk.Tk):
         self.fontsize_label.pack(side="left", padx=(0, 10))
         font_group = tk.Frame(self.font_frame, bg=COLORS["background"])
         font_group.pack(side="left")
+        # Modified button texts for better visibility and UX
         self.font_dec_btn = tk.Button(
             font_group,
-            text="A-",
+            text="-",
             font=FONTS["button"],
             bg=COLORS.get("primary_btn_bg", COLORS["button_bg"]),
             fg=COLORS["button_fg"],
@@ -441,7 +448,7 @@ class CoinScanApp(tk.Tk):
         self.font_dec_btn.pack(side="left", padx=(0, 4))
         self.font_inc_btn = tk.Button(
             font_group,
-            text="A+",
+            text="+",
             font=FONTS["button"],
             bg=COLORS.get("primary_btn_bg", COLORS["button_bg"]),
             fg=COLORS["button_fg"],
@@ -463,7 +470,7 @@ class CoinScanApp(tk.Tk):
         self.recognition_list.pack(pady=(0, 8))
 
         # Internal model for detected coins to support manual post-processing.
-        # Each entry is a dict: {value, label, colour, radius, hue}
+        # Each entry is a dict: {value}
         self.detected_coins: list[dict] = []
 
         # Manual edit controls (Add / Edit / Remove)
@@ -1113,9 +1120,11 @@ class CoinScanApp(tk.Tk):
 
         self.update_idletasks()
 
-        results_w = max(self.results_panel.winfo_reqwidth(), 320)
-        width = SIZES["sidebar_width"] + 40 + self.current_size[0] + 40 + results_w + 40
-        height = max(700, self.current_size[1] + 40 + 40 + 48 + SIZES["footer_height"])
+        # Increase margins and minimums so resized window is larger by default.
+        results_w = max(self.results_panel.winfo_reqwidth(), 360)
+        margin = 60
+        width = SIZES["sidebar_width"] + margin + self.current_size[0] + margin + results_w + margin
+        height = max(850, self.current_size[1] + margin + margin + 48 + SIZES.get("footer_height", 30))
 
         self.geometry(f"{width}x{height}")
 
@@ -1135,21 +1144,20 @@ class CoinScanApp(tk.Tk):
     def handle_recognition_results(self, results: list) -> None:
         """Receive structured detection results from webcam_stream.
 
-        results: list of tuples (value, label, colour_label, radius, mean_hue)
+        results: list of tuples where the first element is value.
+        Any additional fields (label, colour, radius, hue) are ignored by the UI model.
         This runs on the Tk main thread.
         """
         try:
-            # Parse incoming results into normalized dicts
-            new_coins = [
-                {
-                    "value": float(r[0]),
-                    "label": str(r[1]),
-                    "colour": str(r[2]),
-                    "radius": int(r[3]),
-                    "hue": float(r[4]),
-                }
-                for r in results
-            ]
+            # Parse incoming results into normalized dicts with only value
+            new_coins = []
+            for r in results:
+                try:
+                    value = float(r[0])
+                except Exception:
+                    # skip invalid entries
+                    continue
+                new_coins.append({"value": value})
         except Exception:
             new_coins = []
 
@@ -1353,7 +1361,7 @@ class CoinScanApp(tk.Tk):
                     value = float(coin.get("value", 0))
                 except Exception:
                     value = 0.0
-                label = f"{coin.get('label', '')} ({value:.2f} €)"
+                label = f"€{value:.2f}"
                 self.recognition_list.insert("end", label)
 
             # Update total label using the centralized accessor
@@ -1376,9 +1384,29 @@ class CoinEditDialog:
         self.win.transient(parent)
         self.win.grab_set()
 
+        # Make dialog larger for easier editing and visibility
+        dlg_w = 460
+        dlg_h = 160
+        try:
+            # Center the dialog over the parent window when possible
+            self.win.update_idletasks()
+            pw = parent.winfo_width() or self.win.winfo_screenwidth()
+            ph = parent.winfo_height() or self.win.winfo_screenheight()
+            px = parent.winfo_rootx() or 0
+            py = parent.winfo_rooty() or 0
+            x = px + max(0, (pw - dlg_w) // 2)
+            y = py + max(0, (ph - dlg_h) // 2)
+            self.win.geometry(f"{dlg_w}x{dlg_h}+{x}+{y}")
+        except Exception:
+            # Fallback to fixed size if centering fails
+            self.win.geometry(f"{dlg_w}x{dlg_h}")
+
+        self.win.resizable(False, False)
+
         # Coin details form
         self.form_frame = tk.Frame(self.win, bg=COLORS["background"])
-        self.form_frame.pack(padx=20, pady=20, fill="x")
+        # Allow the form to expand to use the larger dialog area
+        self.form_frame.pack(padx=20, pady=16, fill="both", expand=True)
 
         tk.Label(
             self.form_frame,
@@ -1386,88 +1414,22 @@ class CoinEditDialog:
             bg=COLORS["background"],
             fg="#000000",
             font=("Segoe UI", 10),
-        ).grid(row=0, column=0, sticky="w", pady=(0, 10))
+        ).grid(row=0, column=0, sticky="w", pady=(0, 10), padx=(0, 6))
 
+        # Wider entry to match larger dialog
         self.value_entry = tk.Entry(
             self.form_frame,
-            font=("Segoe UI", 10),
+            font=("Segoe UI", 12),
             fg="#000000",
             bd=1,
             relief="solid",
+            width=28,
         )
-        self.value_entry.grid(row=0, column=1, pady=(0, 10))
+        self.value_entry.grid(row=0, column=1, pady=(0, 10), sticky="w")
 
-        tk.Label(
-            self.form_frame,
-            text="Label:",
-            bg=COLORS["background"],
-            fg="#000000",
-            font=("Segoe UI", 10),
-        ).grid(row=1, column=0, sticky="w", pady=(0, 10))
-
-        self.label_entry = tk.Entry(
-            self.form_frame,
-            font=("Segoe UI", 10),
-            fg="#000000",
-            bd=1,
-            relief="solid",
-        )
-        self.label_entry.grid(row=1, column=1, pady=(0, 10))
-
-        tk.Label(
-            self.form_frame,
-            text="Color:",
-            bg=COLORS["background"],
-            fg="#000000",
-            font=("Segoe UI", 10),
-        ).grid(row=2, column=0, sticky="w", pady=(0, 10))
-
-        self.color_entry = tk.Entry(
-            self.form_frame,
-            font=("Segoe UI", 10),
-            fg="#000000",
-            bd=1,
-            relief="solid",
-        )
-        self.color_entry.grid(row=2, column=1, pady=(0, 10))
-
-        tk.Label(
-            self.form_frame,
-            text="Radius:",
-            bg=COLORS["background"],
-            fg="#000000",
-            font=("Segoe UI", 10),
-        ).grid(row=3, column=0, sticky="w", pady=(0, 10))
-
-        self.radius_entry = tk.Entry(
-            self.form_frame,
-            font=("Segoe UI", 10),
-            fg="#000000",
-            bd=1,
-            relief="solid",
-        )
-        self.radius_entry.grid(row=3, column=1, pady=(0, 10))
-
-        tk.Label(
-            self.form_frame,
-            text="Hue:",
-            bg=COLORS["background"],
-            fg="#000000",
-            font=("Segoe UI", 10),
-        ).grid(row=4, column=0, sticky="w", pady=(0, 10))
-
-        self.hue_entry = tk.Entry(
-            self.form_frame,
-            font=("Segoe UI", 10),
-            fg="#000000",
-            bd=1,
-            relief="solid",
-        )
-        self.hue_entry.grid(row=4, column=1, pady=(0, 10))
-
-        # Buttons
+        # Buttons placed in a frame at the bottom-right for better layout
         self.button_frame = tk.Frame(self.win, bg=COLORS["background"])
-        self.button_frame.pack(pady=(10, 0))
+        self.button_frame.pack(pady=(0, 12), padx=20, anchor="e")
 
         tk.Button(
             self.button_frame,
@@ -1481,9 +1443,9 @@ class CoinEditDialog:
             ),
             activeforeground=COLORS["button_active_fg"],
             bd=0,
-            padx=20,
+            padx=18,
             pady=8,
-        ).pack(side="left", padx=10)
+        ).pack(side="right", padx=(8, 0))
 
         tk.Button(
             self.button_frame,
@@ -1493,17 +1455,13 @@ class CoinEditDialog:
             bg=COLORS["button_bg"],
             fg=COLORS["button_fg"],
             bd=0,
-            padx=20,
+            padx=18,
             pady=8,
-        ).pack(side="left", padx=10)
+        ).pack(side="right", padx=(0, 8))
 
         # Fill in current coin details if editing
         if coin:
             self.value_entry.insert(0, str(coin.get("value", "")))
-            self.label_entry.insert(0, coin.get("label", ""))
-            self.color_entry.insert(0, coin.get("colour", ""))
-            self.radius_entry.insert(0, str(coin.get("radius", "")))
-            self.hue_entry.insert(0, str(coin.get("hue", "")))
 
         self.win.protocol("WM_DELETE_WINDOW", self.on_cancel)
         self.value_entry.focus_set()
@@ -1518,17 +1476,9 @@ class CoinEditDialog:
     def on_ok(self) -> None:
         try:
             value = float(self.value_entry.get())
-            label = self.label_entry.get()
-            colour = self.color_entry.get()
-            radius = float(self.radius_entry.get())
-            hue = float(self.hue_entry.get())
 
             self.result = {
                 "value": value,
-                "label": label,
-                "colour": colour,
-                "radius": radius,
-                "hue": hue,
             }
 
             self.win.destroy()
