@@ -5,7 +5,7 @@ from typing import Tuple, Callable, Any, Dict, Optional
 
 import cv2
 import numpy as np
-from PIL import Image, ImageTk
+from PIL import Image, ImageTk, ImageFilter, ImageDraw
 
 from language import LANGUAGES, format_total, get_text
 
@@ -178,6 +178,9 @@ def update_recognition(
             total = 0.0
             results: list[Tuple[float, str, str, int, float]] = []
 
+            # Variables to hold detected circle for display compositing
+            detected_circle = None
+
             if circles is not None:
                 tic("postprocess_circles")
                 # Round and convert circles to uint16 Nx3 array
@@ -220,11 +223,8 @@ def update_recognition(
                         (value, label, colour_label, int(r), float(mean_hue))
                     )
 
-                    # Draw annotations on the frame for display
-                    tic("annotate")
-                    cv2.circle(frame, (x, y), r, (0, 255, 0), 2)
-                    cv2.circle(frame, (x, y), 2, (0, 0, 255), 3)
-                    toc("annotate")
+                    # Save detected circle for later compositing on the display image.
+                    detected_circle = (int(x), int(y), int(r))
                     found = True
 
             if not found:
@@ -262,6 +262,60 @@ def update_recognition(
             tic("to_pil")
             img = Image.fromarray(resized)
             toc("to_pil")
+
+            # If a coin was detected, blur everything outside the detected circle.
+            tic("blur_outside_circle")
+            try:
+                if detected_circle is not None:
+                    # Scale circle coordinates from capture frame to resized image
+                    orig_h, orig_w = frame_rgb.shape[:2]
+                    dst_w, dst_h = current_size
+                    sx = dst_w / orig_w
+                    sy = dst_h / orig_h
+                    # Use uniform scale (frame aspect preserved) for radius
+                    scale = (sx + sy) / 2.0
+                    x_s = int(detected_circle[0] * sx)
+                    y_s = int(detected_circle[1] * sy)
+                    r_s = max(1, int(detected_circle[2] * scale))
+
+                    # Create a blurred version of the whole image
+                    blur_radius = max(15, r_s // 2)
+
+                    # Use a median filter (PIL's MedianFilter) instead of Gaussian blur.
+                    # MedianFilter requires an odd-sized kernel; map blur_radius to an odd size.
+                    kernel = max(3, (int(blur_radius) // 2) * 2 + 1)
+                    blurred = img.filter(ImageFilter.MedianFilter(size=kernel))
+
+                    # Create mask with white circle where the coin is (keep sharp)
+                    mask = Image.new("L", img.size, 0)
+                    draw_mask = ImageDraw.Draw(mask)
+                    bbox = (x_s - r_s, y_s - r_s, x_s + r_s, y_s + r_s)
+                    draw_mask.ellipse(bbox, fill=255)
+
+                    # Composite: keep original (sharp) inside circle, blurred outside
+                    img = Image.composite(img, blurred, mask)
+
+                    # Draw annotation circle and center dot on the composited image
+                    draw = ImageDraw.Draw(img)
+                    # green ring
+                    ring_width = max(2, int(max(1, r_s * 0.06)))
+                    outline_bbox = (bbox[0], bbox[1], bbox[2], bbox[3])
+                    draw.ellipse(outline_bbox, outline="rgb(0,255,0)", width=ring_width)
+                    # small red center
+                    center_r = max(2, r_s // 15)
+                    draw.ellipse(
+                        (
+                            x_s - center_r,
+                            y_s - center_r,
+                            x_s + center_r,
+                            y_s + center_r,
+                        ),
+                        fill="rgb(255,0,0)",
+                    )
+            except Exception:
+                # If anything goes wrong, fall back to the unmodified image
+                pass
+            toc("blur_outside_circle")
 
             # Set image on the webcam label (UI)
             tic("photoimage")
