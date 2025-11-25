@@ -3,24 +3,10 @@ from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
 from functools import lru_cache
 from types import MappingProxyType
 
-"""
-language.py
 
-Localized strings and formatting helpers for the CoinScan UI.
-
-Cleanup and improvements:
-- Added caching for language normalization and lookup.
-- Return read-only mapping from `get_strings` to avoid accidental mutation.
-- Added small helpers: `get_about_text`, `get_all_tooltips`.
-- Hardened Decimal conversion to accept Decimal inputs directly.
-- Minor style and docstring clarifications.
-"""
-
-# Default fallback language code
 DEFAULT_LANG = "en"
 
-# Translations and UI text for supported languages.
-# Keys mirror UI identifiers used across the application.
+
 LANGUAGES: Dict[str, Dict[str, Any]] = {
     "de": {
         "title": "P R O S E G U R",
@@ -80,7 +66,7 @@ LANGUAGES: Dict[str, Dict[str, Any]] = {
     },
 }
 
-# Longer about/help texts per language
+
 ABOUT_TEXTS: Dict[str, str] = {
     "en": (
         "CoinScan is a desktop application designed to help users quickly identify "
@@ -118,15 +104,6 @@ SUPPORTED_LANGS = frozenset(LANGUAGES.keys())
 
 @lru_cache(maxsize=32)
 def normalize_lang(lang: Optional[str]) -> str:
-    """
-    Normalize a language identifier to a supported primary code.
-
-    Examples:
-    - "en-US" -> "en"
-    - "de_DE" -> "de"
-
-    Returns DEFAULT_LANG when input is falsy or not supported.
-    """
     if not lang or not isinstance(lang, str):
         return DEFAULT_LANG
 
@@ -136,58 +113,19 @@ def normalize_lang(lang: Optional[str]) -> str:
 
 @lru_cache(maxsize=32)
 def get_strings(lang: Optional[str]) -> Mapping[str, Any]:
-    """
-    Return a read-only mapping for the normalized language strings.
-    Always returns a mapping (fallback to DEFAULT_LANG).
-    """
     code = normalize_lang(lang)
-    # Return a read-only view to prevent accidental runtime mutation.
     return MappingProxyType(LANGUAGES.get(code, LANGUAGES[DEFAULT_LANG]))
 
 
 def get_text(lang: Optional[str], key: str, default: str = "") -> str:
-    """
-    Retrieve a top-level UI text by key for the given language.
-    If the key is missing, return the provided default.
-    """
     return get_strings(lang).get(key, default)
 
 
-def get_tooltip(lang: Optional[str], key: str, default: str = "") -> str:
-    """
-    Retrieve a tooltip string from the nested 'tooltips' dictionary.
-    """
-    return get_strings(lang).get("tooltips", {}).get(key, default)
-
-
-def get_all_tooltips(lang: Optional[str]) -> Mapping[str, str]:
-    """
-    Return all tooltips for the language as a read-only mapping.
-    Always returns an empty mapping if none are defined.
-    """
-    return MappingProxyType(get_strings(lang).get("tooltips", {}))
-
-
-def get_about_text(lang: Optional[str]) -> str:
-    """
-    Return the longer about/help text for the specified language.
-    Falls back to English when not available.
-    """
-    code = normalize_lang(lang)
-    return ABOUT_TEXTS.get(code, ABOUT_TEXTS.get(DEFAULT_LANG, ""))
-
-
 def _to_decimal(amount: Any) -> Decimal:
-    """
-    Safely convert input to a Decimal rounded to two decimal places.
-    Accepts Decimal, int, float, str-like. Falls back to Decimal('0.00')
-    for invalid inputs.
-    """
     try:
         if isinstance(amount, Decimal):
             d = amount
         else:
-            # Use str(amount) to avoid float precision issues when a float is passed.
             d = Decimal(str(amount))
         return d.quantize(_DECIMAL_QUANT, rounding=ROUND_HALF_UP)
     except (InvalidOperation, ValueError, TypeError):
@@ -195,14 +133,6 @@ def _to_decimal(amount: Any) -> Decimal:
 
 
 def format_total(lang: Optional[str], amount: Any) -> str:
-    """
-    Format a numeric amount into the language-specific total string.
-
-    - Rounds to two decimal places using ROUND_HALF_UP.
-    - Falls back to 0.00 on invalid input.
-    - Uses comma as decimal separator for German ("de").
-    - Inserts the formatted amount into the language's "total_fmt".
-    """
     strings = get_strings(lang)
     fmt = strings.get("total_fmt", "TOTAL: €{amount}")
 
@@ -212,9 +142,7 @@ def format_total(lang: Optional[str], amount: Any) -> str:
     if normalize_lang(lang) == "de":
         amt_str = amt_str.replace(".", ",")
 
-    # Ensure formatting succeeds even if format string is not well-formed.
     try:
         return fmt.format(amount=amt_str)
     except Exception:
-        # Fallback to a simple composed string
         return f"TOTAL: €{amt_str}"

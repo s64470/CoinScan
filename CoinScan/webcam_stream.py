@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 Size = Tuple[int, int]
 
-# Hough / processing defaults
+
 _HOUGH_DP = 1.2
 _HOUGH_MIN_DIST = 30
 _HOUGH_PARAM1 = 50
@@ -23,10 +23,6 @@ _HOUGH_MAX_RADIUS = 90
 
 
 def classify_coin(mean_hue: float, radius: int) -> Tuple[float, str, str]:
-    """Classify a coin by mean hue and radius.
-
-    Returns (value, label, colour_label).
-    """
     if 18 < mean_hue < 35:
         colour_label = "Gold"
     elif 8 < mean_hue <= 18:
@@ -34,7 +30,6 @@ def classify_coin(mean_hue: float, radius: int) -> Tuple[float, str, str]:
     else:
         colour_label = "Silver"
 
-    # Size-based thresholds (largest-first)
     if colour_label == "Gold":
         if radius > 52:
             return 2.00, "2€", colour_label
@@ -63,21 +58,14 @@ def centre_coins(
     circles: np.ndarray | Sequence[Tuple[float, float, float]],
     frame_shape: Tuple[int, int, int],
 ) -> List[Tuple[int, int, int]]:
-    """Filter detected circles to those near the frame centre.
-
-    Accepts HoughCircles output in either shape (1, N, 3) or (N, 3).
-    Returns a list of (x, y, r) with ints.
-    """
     if circles is None:
         return []
 
     arr = np.asarray(circles)
 
-    # Normalize common (1, N, 3) -> (N, 3)
     if arr.ndim == 3 and arr.shape[0] == 1:
         arr = arr[0]
 
-    # Safely coerce to integer coordinates
     try:
         arr = np.rint(arr).astype(int)
     except Exception:
@@ -109,12 +97,7 @@ def update_recognition(
     current_lang: str,
     on_results: Optional[Callable[[List[Tuple[float, str]]], None]] = None,
 ) -> None:
-    """Run a single-frame capture, classify any central coin and update UI.
 
-    If `on_results` is provided it will be called on the UI thread with
-    a list of (value, label) tuples for each detected coin.
-    """
-    # Best-effort: disable scan button immediately
     try:
         scan_button.config(state="disabled")
     except Exception:
@@ -122,7 +105,7 @@ def update_recognition(
 
     def stream() -> None:
         def ui(callable_obj: Callable, *args, **kwargs) -> None:
-            """Schedule a callable on the Tk main thread if possible, else run inline."""
+
             try:
                 recognition.after(0, lambda: callable_obj(*args, **kwargs))
             except Exception:
@@ -132,15 +115,15 @@ def update_recognition(
                     logger.debug("Failed to run UI callable", exc_info=True)
 
         def set_webcam_image(pil_img: Image.Image) -> None:
-            """Set a PIL image onto the webcam_label while preventing GC."""
+
             try:
                 imgtk = ImageTk.PhotoImage(image=pil_img)
-                webcam_label.imgtk = imgtk  # keep reference to prevent GC
+                webcam_label.imgtk = imgtk
                 webcam_label.configure(image=imgtk)
                 try:
                     scan_button.config(text=get_text(current_lang, "rescan", "Rescan"))
                 except Exception:
-                    # Non-critical UI update
+
                     pass
             except Exception:
                 logger.debug("Failed to set webcam image", exc_info=True)
@@ -148,10 +131,10 @@ def update_recognition(
         def compute_mean_hue_from_mask(
             frame_bgr: np.ndarray, mask: np.ndarray
         ) -> float:
-            """Return mean hue for pixels inside mask (0/255) or 0.0 if none."""
+
             try:
                 coin_hsv = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2HSV)
-                # Select hue values where mask is set
+
                 coin_hue = coin_hsv[:, :, 0][mask == 255].astype(np.float64)
                 return float(np.mean(coin_hue)) if coin_hue.size > 0 else 0.0
             except Exception:
@@ -161,7 +144,7 @@ def update_recognition(
         def annotate_image(
             frame_rgb: np.ndarray, detected_circle: Tuple[int, int, int]
         ) -> Image.Image:
-            """Return a PIL Image with blur-outside-coin and annotations applied."""
+
             img = Image.fromarray(
                 cv2.resize(frame_rgb, current_size, interpolation=cv2.INTER_LINEAR)
             )
@@ -177,7 +160,7 @@ def update_recognition(
                 r_s = max(1, int(detected_circle[2] * scale))
 
                 blur_radius = max(15, r_s // 2)
-                # MedianFilter expects an odd integer size >= 3
+
                 kernel = max(3, (int(blur_radius) // 2) * 2 + 1)
                 blurred = img.filter(ImageFilter.MedianFilter(size=kernel))
 
@@ -251,7 +234,7 @@ def update_recognition(
             if circles is not None:
                 centered = centre_coins(circles, frame.shape)
                 if centered:
-                    # choose the largest detected central circle
+
                     x, y, r = max(centered, key=lambda c: c[2])
 
                     mask = np.zeros(gray.shape, dtype=np.uint8)
@@ -274,7 +257,6 @@ def update_recognition(
                     get_text(current_lang, "no_coin", "No coin detected in centre."),
                 )
 
-            # Deliver results to caller or update total label
             if on_results is not None:
                 try:
                     ui(on_results, results)
@@ -283,7 +265,6 @@ def update_recognition(
             else:
                 ui(total_label.config, text=format_total(current_lang, total))
 
-            # Prepare display image and push to UI
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             if detected_circle is not None:
                 img = annotate_image(frame_rgb, detected_circle)

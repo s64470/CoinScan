@@ -1,24 +1,12 @@
-﻿"""
-UI configuration constants for the CoinScan application.
+﻿from pathlib import Path
+from typing import Final, Mapping, Tuple, Union, Dict
 
-Contains colors, fonts, sizes and icon paths used by the UI.
-This module exposes typed constants and small helpers for retrieving
-and inspecting icon paths.
-"""
 
-from pathlib import Path
-from typing import Final, Mapping, Tuple, Union, Sequence
-
-# Type aliases for clarity
-FontDef = Tuple[
-    Union[str, int], ...
-]  # font tuples vary: ("Family", size[, "style"...])
+FontDef = Tuple[Union[str, int], ...]
 SizeDef = Union[Tuple[int, int], int]
 
-# Default width used for logos and sidebar icons.
 LOGO_WIDTH: Final[int] = 50
 
-# Color palette used throughout the UI (hex color strings).
 COLORS: Final[Mapping[str, str]] = {
     "background": "#FFD100",
     "panel_bg": "#FFFFFF",
@@ -48,7 +36,6 @@ COLORS: Final[Mapping[str, str]] = {
     "font_btn_disabled_fg": "#FFFF00",
 }
 
-# Font definitions used in the UI: (family, size, [style...]).
 FONTS: Final[Mapping[str, FontDef]] = {
     "title": ("Segoe UI", 18, "bold"),
     "sidebar": ("Segoe UI", 16),
@@ -64,10 +51,8 @@ FONTS: Final[Mapping[str, FontDef]] = {
     "footer": ("Segoe UI", 8),
 }
 
-# Directory containing icon image files (relative to this file).
 ICON_DIR: Final[Path] = (Path(__file__).parent / "icon").resolve(strict=False)
 
-# Known icon filenames (keeps mapping clear and easy to extend).
 _ICON_FILES: Final[Mapping[str, str]] = {
     "flag_de": "flag_DE.png",
     "flag_en": "flag_UK.png",
@@ -75,18 +60,15 @@ _ICON_FILES: Final[Mapping[str, str]] = {
     "prosegur_globe": "prosegur_globe.png",
 }
 
-# Resolved paths (non-strict resolve so import doesn't fail if files are absent).
-ICON_PATHS: Final[Mapping[str, str]] = {
+ICON_PATHS: Final[Dict[str, str]] = {
     key: str((ICON_DIR / filename).resolve(strict=False))
     for key, filename in _ICON_FILES.items()
 }
 
-# Mapping of logical logos to their high-contrast image paths.
 HIGH_CONTRAST_LOGOS: Final[Mapping[str, str]] = {
     "prosegur": ICON_PATHS.get("prosegur_globe", "")
 }
 
-# Standard sizes for windows, webcams and UI elements.
 SIZES: Final[Mapping[str, SizeDef]] = {
     "window": (1600, 950),
     "webcam_small": (480, 360),
@@ -98,15 +80,13 @@ SIZES: Final[Mapping[str, SizeDef]] = {
     "footer_height": 30,
 }
 
-# Unicode icons displayed in the sidebar (simple glyphs).
 SIDEBAR_ICONS: Final[Tuple[str, ...]] = (
-    "\U0001f3e0",  # home
-    "\u2699\ufe0f",  # gear
-    "\u2753",  # question mark
-    "\u23fb",  # power / standby
+    "\U0001f3e0",
+    "\u2699\ufe0f",
+    "\u2753",
+    "\u23fb",
 )
 
-# Icons used to indicate normal vs contrast mode.
 CONTRAST_ICONS: Final[Mapping[str, str]] = {
     "normal": "\U0001f313",
     "contrast": "\u2600\ufe0f",
@@ -114,31 +94,20 @@ CONTRAST_ICONS: Final[Mapping[str, str]] = {
 
 
 def icon_path(name: str) -> str:
-    """
-    Return the absolute path string for a named icon. If the icon is unknown returns an empty string.
-
-    Prefer this helper in UI code instead of accessing ICON_PATHS directly.
-    """
     return ICON_PATHS.get(name, "")
 
 
 def icon_exists(name: str) -> bool:
-    """
-    Return True if the named icon file exists on disk.
-
-    Uses the resolved path stored in ICON_PATHS and checks the filesystem.
-    """
     p = icon_path(name)
     if not p:
         return False
     try:
         return Path(p).is_file()
-    except Exception:
+    except OSError:
         return False
 
 
 def available_icons() -> Tuple[str, ...]:
-    """Return the tuple of known icon keys (stable order)."""
     return tuple(ICON_PATHS.keys())
 
 
