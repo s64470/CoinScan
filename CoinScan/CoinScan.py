@@ -528,9 +528,10 @@ class CoinScanApp(tk.Tk):
 
     def _create_denominations_table(self) -> None:
         """
-        Create a simple two-column table with visible lines and static denominations
-        (from €2.00 down to €0.01). Placed at the bottom of the webcam panel so the
-        table lines up with the webcam border.
+        Create a three-column table with visible lines and static denominations
+        (from €2.00 down to €0.01). Columns: Denomination | Qty | Sum.
+        A total row is added at the bottom showing the summed value of all denominations.
+        Placed at the bottom of the webcam panel so the table lines up with the webcam border.
         """
         try:
             # Parent is webcam_panel so table aligns with the webcam border and sits
@@ -560,26 +561,38 @@ class CoinScanApp(tk.Tk):
                 anchor="center",
                 padx=6,
             )
+            header_sum = tk.Label(
+                self.denominations_frame,
+                text="Sum",
+                font=hdr_font,
+                bd=1,
+                relief="solid",
+                anchor="e",
+                padx=6,
+            )
 
             header_denom.grid(row=0, column=0, sticky="ew")
             header_qty.grid(row=0, column=1, sticky="ew")
+            header_sum.grid(row=0, column=2, sticky="ew")
 
-            denominations = [
-                "€2.00",
-                "€1.00",
-                "€0.50",
-                "€0.20",
-                "€0.10",
-                "€0.05",
-                "€0.02",
-                "€0.01",
+            # store numeric values to map counts and sums
+            self._denomination_values: List[float] = [
+                2.00,
+                1.00,
+                0.50,
+                0.20,
+                0.10,
+                0.05,
+                0.02,
+                0.01,
             ]
 
-            rows: List[Tuple[tk.Label, tk.Label]] = []
-            for idx, d in enumerate(denominations, start=1):
+            rows: List[Tuple[tk.Label, tk.Label, tk.Label]] = []
+            for idx, d_val in enumerate(self._denomination_values, start=1):
+                d_text = f"€{d_val:.2f}"
                 lbl_denom = tk.Label(
                     self.denominations_frame,
-                    text=d,
+                    text=d_text,
                     font=cell_font,
                     bd=1,
                     relief="solid",
@@ -595,18 +608,66 @@ class CoinScanApp(tk.Tk):
                     anchor="center",
                     padx=6,
                 )
+                lbl_sum = tk.Label(
+                    self.denominations_frame,
+                    text="€0.00",
+                    font=cell_font,
+                    bd=1,
+                    relief="solid",
+                    anchor="e",
+                    padx=6,
+                )
                 lbl_denom.grid(row=idx, column=0, sticky="ew")
                 lbl_qty.grid(row=idx, column=1, sticky="ew")
-                rows.append((lbl_denom, lbl_qty))
+                lbl_sum.grid(row=idx, column=2, sticky="ew")
+                rows.append((lbl_denom, lbl_qty, lbl_sum))
+
+            # total row
+            total_label = tk.Label(
+                self.denominations_frame,
+                text="Total",
+                font=hdr_font,
+                bd=1,
+                relief="solid",
+                anchor="w",
+                padx=6,
+            )
+            total_value_label = tk.Label(
+                self.denominations_frame,
+                text="€0.00",
+                font=hdr_font,
+                bd=1,
+                relief="solid",
+                anchor="e",
+                padx=6,
+            )
+            total_label.grid(row=len(self._denomination_values) + 1, column=0, sticky="ew")
+            # span qty column empty space
+            empty_span = tk.Label(
+                self.denominations_frame,
+                text="",
+                font=hdr_font,
+                bd=1,
+                relief="solid",
+                anchor="center",
+                padx=6,
+            )
+            empty_span.grid(row=len(self._denomination_values) + 1, column=1, sticky="ew")
+            total_value_label.grid(row=len(self._denomination_values) + 1, column=2, sticky="ew")
 
             # make columns expand evenly
             self.denominations_frame.grid_columnconfigure(0, weight=3)
             self.denominations_frame.grid_columnconfigure(1, weight=1)
+            self.denominations_frame.grid_columnconfigure(2, weight=1)
 
             # Pack at bottom of webcam_panel so it aligns to the webcam border.
             # Use small horizontal padding so it doesn't overlap the webcam highlight.
             self.denominations_frame.pack(side="bottom", pady=(6, 10), padx=6, fill="x")
-            self.denomination_widgets = {"header": (header_denom, header_qty), "rows": rows}
+            self.denomination_widgets = {
+                "header": (header_denom, header_qty, header_sum),
+                "rows": rows,
+                "total": (total_label, total_value_label),
+            }
         except Exception as exc:
             logger.debug("Failed to create denominations table: %s", exc, exc_info=True)
 
@@ -926,18 +987,29 @@ class CoinScanApp(tk.Tk):
                 header_fg = COLORS.get("contrast_fg") if self.high_contrast else "#000000"
                 cell_bg = COLORS.get("contrast_bg") if self.high_contrast else COLORS.get("listbox_bg", "white")
                 cell_fg = COLORS.get("contrast_fg") if self.high_contrast else "black"
-                hdr_left, hdr_right = self.denomination_widgets["header"]
+                hdr_left, hdr_mid, hdr_right = self.denomination_widgets["header"]
                 try:
                     hdr_left.config(bg=header_bg, fg=header_fg)
+                    hdr_mid.config(bg=header_bg, fg=header_fg)
                     hdr_right.config(bg=header_bg, fg=header_fg)
                 except Exception:
                     pass
-                for left, right in self.denomination_widgets["rows"]:
+                for left, mid, right in self.denomination_widgets["rows"]:
                     try:
                         left.config(bg=cell_bg, fg=cell_fg)
+                        mid.config(bg=cell_bg, fg=cell_fg)
                         right.config(bg=cell_bg, fg=cell_fg)
                     except Exception:
                         pass
+                # total row
+                try:
+                    tleft, tright = self.denomination_widgets.get("total", (None, None))
+                    if tleft:
+                        tleft.config(bg=header_bg, fg=header_fg)
+                    if tright:
+                        tright.config(bg=header_bg, fg=header_fg)
+                except Exception:
+                    pass
         except Exception:
             logger.debug("Failed to update denominations table colors", exc_info=True)
 
@@ -1328,6 +1400,46 @@ class CoinScanApp(tk.Tk):
 
             total_value = self.get_total_value()
             self.total_label.config(text=f"TOTAL: €{total_value:.2f}")
+
+            # Update denominations table quantities and sums if present
+            try:
+                if hasattr(self, "denomination_widgets") and hasattr(self, "_denomination_values"):
+                    # initialize counts
+                    counts: Dict[float, int] = {v: 0 for v in self._denomination_values}
+                    for coin in self.detected_coins:
+                        try:
+                            v = round(float(coin.get("value", 0)), 2)
+                        except Exception:
+                            continue
+                        # direct match or nearest match within small epsilon
+                        if v in counts:
+                            counts[v] += 1
+                        else:
+                            for dv in self._denomination_values:
+                                if abs(dv - v) < 0.001:
+                                    counts[dv] += 1
+                                    break
+
+                    # update labels
+                    for idx, dv in enumerate(self._denomination_values):
+                        try:
+                            left, qty_lbl, sum_lbl = self.denomination_widgets["rows"][idx]
+                            qty_lbl.config(text=str(counts.get(dv, 0)))
+                            sum_val = counts.get(dv, 0) * dv
+                            sum_lbl.config(text=f"€{sum_val:.2f}")
+                        except Exception:
+                            continue
+
+                    # update total field in the table (use computed sum to avoid rounding drift)
+                    try:
+                        total_label, total_value_label = self.denomination_widgets.get("total", (None, None))
+                        table_total = sum(counts.get(dv, 0) * dv for dv in self._denomination_values)
+                        if total_value_label:
+                            total_value_label.config(text=f"€{table_total:.2f}")
+                    except Exception:
+                        pass
+            except Exception:
+                logger.debug("Failed to update denominations sums", exc_info=True)
         except Exception as exc:
             logger.debug("Failed to update recognition list: %s", exc, exc_info=True)
 
