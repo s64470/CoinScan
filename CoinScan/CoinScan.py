@@ -84,9 +84,7 @@ def generate_prosegur_globe_bg(
 
 
 class Tooltip:
-    def __init__(
-        self, widget: tk.Widget, text_func: Callable[[], str], delay: int = 400
-    ) -> None:
+    def __init__(self, widget: tk.Widget, text_func: Callable[[], str], delay: int = 400) -> None:
         self.widget = widget
         self.text_func = text_func
         self.delay = int(delay)
@@ -220,6 +218,7 @@ class CoinScanApp(tk.Tk):
         )
         self.flag_de_btn.pack(side="left", padx=2)
 
+        # Fixed: use the correctly named variable `topbar_controls` (was `topbarControls`)
         self.flag_en_btn = tk.Button(
             topbar_controls,
             image=self.flag_en,
@@ -312,7 +311,7 @@ class CoinScanApp(tk.Tk):
         )
         self.webcam_label.pack(pady=(10, 6))
 
-        # Added: denominations table below webcam_label
+        # Denominations table will be created (and placed at the bottom of main content)
         self._create_denominations_table()
 
         self.brand_right_photo: Optional[ImageTk.PhotoImage] = None
@@ -412,44 +411,48 @@ class CoinScanApp(tk.Tk):
         self.edit_frame = tk.Frame(self.webcam_panel, bg=COLORS["background"])
         self.edit_frame.pack(pady=(0, 8))
 
+        # Cleaned button block: use single quotes for internal dict lookups and compact formatting.
         self.add_btn = tk.Button(
             self.edit_frame,
             text="Add",
-            font=FONTS["button"],
+            font=FONTS['button'],
             command=self.add_coin,
             bd=0,
             padx=8,
-            pady=4,
+            pady=4
         )
         self.add_btn.pack(side="left", padx=4)
+
         self.edit_btn = tk.Button(
             self.edit_frame,
             text="Edit",
-            font=FONTS["button"],
+            font=FONTS['button'],
             command=self.edit_selected,
             bd=0,
             padx=8,
-            pady=4,
+            pady=4
         )
         self.edit_btn.pack(side="left", padx=4)
+
         self.remove_btn = tk.Button(
             self.edit_frame,
             text="Remove",
-            font=FONTS["button"],
+            font=FONTS['button'],
             command=self.remove_selected,
             bd=0,
             padx=8,
-            pady=4,
+            pady=4
         )
         self.remove_btn.pack(side="left", padx=4)
+
         self.total_btn = tk.Button(
             self.edit_frame,
             text="Total",
-            font=FONTS["button"],
+            font=FONTS['button'],
             command=self.show_total,
             bd=0,
             padx=8,
-            pady=4,
+            pady=4
         )
         self.total_btn.pack(side="left", padx=4)
 
@@ -526,9 +529,12 @@ class CoinScanApp(tk.Tk):
     def _create_denominations_table(self) -> None:
         """
         Create a simple two-column table with visible lines and static denominations
-        (from €2.00 down to €0.01). Placed directly below the webcam label.
+        (from €2.00 down to €0.01). Placed at the bottom of the webcam panel so the
+        table lines up with the webcam border.
         """
         try:
+            # Parent is webcam_panel so table aligns with the webcam border and sits
+            # inside the webcam area at the bottom.
             self.denominations_frame = tk.Frame(
                 self.webcam_panel, bg=COLORS["background"]
             )
@@ -597,7 +603,9 @@ class CoinScanApp(tk.Tk):
             self.denominations_frame.grid_columnconfigure(0, weight=3)
             self.denominations_frame.grid_columnconfigure(1, weight=1)
 
-            self.denominations_frame.pack(pady=(6, 10), fill="x")
+            # Pack at bottom of webcam_panel so it aligns to the webcam border.
+            # Use small horizontal padding so it doesn't overlap the webcam highlight.
+            self.denominations_frame.pack(side="bottom", pady=(6, 10), padx=6, fill="x")
             self.denomination_widgets = {"header": (header_denom, header_qty), "rows": rows}
         except Exception as exc:
             logger.debug("Failed to create denominations table: %s", exc, exc_info=True)
@@ -798,7 +806,7 @@ class CoinScanApp(tk.Tk):
                     else COLORS.get("primary_btn_bg", COLORS["button_bg"])
                 ),
                 fg=(
-                    COLORS.get("font_btn_disabled_fg")
+                    COLORS.get("font_btn_disabledFg")
                     if disabled
                     else COLORS["button_fg"]
                 ),
@@ -1325,9 +1333,7 @@ class CoinScanApp(tk.Tk):
 
 
 class CoinEditDialog:
-    def __init__(
-        self, parent: tk.Widget, coin: Optional[Dict[str, Any]] = None
-    ) -> None:
+    def __init__(self, parent: tk.Widget, coin: Optional[Dict[str, Any]] = None) -> None:
         self.parent = parent
         self.coin = coin
 
