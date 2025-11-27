@@ -5,25 +5,26 @@ import json
 import logging
 import os
 import tempfile
+from typing import Any, Dict
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_SETTINGS = {
+DEFAULT_SETTINGS: Dict[str, Any] = {
     "language": "en",
     "webcam_size": "small",
     "high_contrast": False,
     "font_size": 14,
 }
 
+__all__ = ("load_settings", "save_settings", "SETTINGS_FILE", "DEFAULT_SETTINGS")
+
 
 def _default_settings_path() -> Path:
     env = os.getenv("COINSCAN_SETTINGS")
     if env:
         p = Path(env)
-
         if p.is_dir():
             return p / "coinscan_settings.json"
-
         try:
             p.parent.mkdir(parents=True, exist_ok=True)
         except Exception:
@@ -55,18 +56,24 @@ def _default_settings_path() -> Path:
 SETTINGS_FILE: Path = _default_settings_path()
 
 
-def _validate_and_merge(data: object) -> dict:
+def _same_type(value: Any, prototype: Any) -> bool:
+    if isinstance(prototype, bool):
+        return isinstance(value, bool)
+    return type(value) is type(prototype)
+
+
+def _validate_and_merge(data: Any) -> Dict[str, Any]:
     if not isinstance(data, dict):
         return DEFAULT_SETTINGS.copy()
 
-    merged = DEFAULT_SETTINGS.copy()
-    merged.update({k: v for k, v in data.items() if k not in DEFAULT_SETTINGS})
+    merged: Dict[str, Any] = DEFAULT_SETTINGS.copy()
+    unknown_items = {k: v for k, v in data.items() if k not in DEFAULT_SETTINGS}
+    merged.update(unknown_items)
 
     for key, default_value in DEFAULT_SETTINGS.items():
         if key in data:
             incoming = data[key]
-
-            if type(incoming) is type(default_value):
+            if _same_type(incoming, default_value):
                 merged[key] = incoming
             else:
                 merged[key] = default_value
@@ -79,7 +86,7 @@ def _validate_and_merge(data: object) -> dict:
     return merged
 
 
-def load_settings() -> dict:
+def load_settings() -> Dict[str, Any]:
     try:
         if SETTINGS_FILE.exists():
             with SETTINGS_FILE.open("r", encoding="utf-8") as f:
@@ -90,7 +97,7 @@ def load_settings() -> dict:
     return DEFAULT_SETTINGS.copy()
 
 
-def save_settings(settings: dict) -> None:
+def save_settings(settings: Dict[str, Any]) -> None:
     if not isinstance(settings, dict):
         raise TypeError("settings must be a dict")
 
@@ -105,7 +112,7 @@ def save_settings(settings: dict) -> None:
             exc_info=True,
         )
 
-    tmp_path = None
+    tmp_path: Path | None = None
     try:
         with tempfile.NamedTemporaryFile(
             prefix=SETTINGS_FILE.name + ".",
@@ -121,6 +128,7 @@ def save_settings(settings: dict) -> None:
             tmp_path = Path(tmp_fp.name)
 
         os.replace(str(tmp_path), str(SETTINGS_FILE))
+        tmp_path = None
     except Exception:
         logger.exception("Failed to save settings")
 

@@ -84,11 +84,13 @@ def generate_prosegur_globe_bg(
 
 
 class Tooltip:
-    def __init__(self, widget: tk.Widget, text_func: Callable[[], str], delay: int = 400) -> None:
+    def __init__(
+        self, widget: tk.Widget, text_func: Callable[[], str], delay: int = 400
+    ) -> None:
         self.widget = widget
         self.text_func = text_func
         self.delay = int(delay)
-        self._id: Optional[str] = None
+        self._id: Optional[int] = None
         self.tip: Optional[tk.Toplevel] = None
         widget.bind("<Enter>", self._schedule)
         widget.bind("<Leave>", self._hide_now)
@@ -218,7 +220,6 @@ class CoinScanApp(tk.Tk):
         )
         self.flag_de_btn.pack(side="left", padx=2)
 
-        # Fixed: use the correctly named variable `topbar_controls` (was `topbarControls`)
         self.flag_en_btn = tk.Button(
             topbar_controls,
             image=self.flag_en,
@@ -311,7 +312,6 @@ class CoinScanApp(tk.Tk):
         )
         self.webcam_label.pack(pady=(10, 6))
 
-        # Denominations table will be created (and placed at the bottom of main content)
         self._create_denominations_table()
 
         self.brand_right_photo: Optional[ImageTk.PhotoImage] = None
@@ -411,48 +411,47 @@ class CoinScanApp(tk.Tk):
         self.edit_frame = tk.Frame(self.webcam_panel, bg=COLORS["background"])
         self.edit_frame.pack(pady=(0, 8))
 
-        # Cleaned button block: use single quotes for internal dict lookups and compact formatting.
         self.add_btn = tk.Button(
             self.edit_frame,
             text="Add",
-            font=FONTS['button'],
+            font=FONTS["button"],
             command=self.add_coin,
             bd=0,
             padx=8,
-            pady=4
+            pady=4,
         )
         self.add_btn.pack(side="left", padx=4)
 
         self.edit_btn = tk.Button(
             self.edit_frame,
             text="Edit",
-            font=FONTS['button'],
+            font=FONTS["button"],
             command=self.edit_selected,
             bd=0,
             padx=8,
-            pady=4
+            pady=4,
         )
         self.edit_btn.pack(side="left", padx=4)
 
         self.remove_btn = tk.Button(
             self.edit_frame,
             text="Remove",
-            font=FONTS['button'],
+            font=FONTS["button"],
             command=self.remove_selected,
             bd=0,
             padx=8,
-            pady=4
+            pady=4,
         )
         self.remove_btn.pack(side="left", padx=4)
 
         self.total_btn = tk.Button(
             self.edit_frame,
             text="Total",
-            font=FONTS['button'],
+            font=FONTS["button"],
             command=self.show_total,
             bd=0,
             padx=8,
-            pady=4
+            pady=4,
         )
         self.total_btn.pack(side="left", padx=4)
 
@@ -527,19 +526,11 @@ class CoinScanApp(tk.Tk):
         Tooltip(self.results_panel, tt("results_panel"))
 
     def _create_denominations_table(self) -> None:
-        """
-        Create a three-column table with visible lines and static denominations
-        (from €2.00 down to €0.01). Columns: Denomination | Qty | Sum.
-        A total row is added at the bottom showing the summed value of all denominations.
-        Placed at the bottom of the webcam panel so the table lines up with the webcam border.
-        """
         try:
-            # Parent is webcam_panel so table aligns with the webcam border and sits
-            # inside the webcam area at the bottom.
             self.denominations_frame = tk.Frame(
                 self.webcam_panel, bg=COLORS["background"]
             )
-            # table header
+
             hdr_font = FONTS.get("button", ("Segoe UI", 10, "bold"))
             cell_font = FONTS.get("listbox", ("Segoe UI", 10))
 
@@ -575,7 +566,6 @@ class CoinScanApp(tk.Tk):
             header_qty.grid(row=0, column=1, sticky="ew")
             header_sum.grid(row=0, column=2, sticky="ew")
 
-            # store numeric values to map counts and sums
             self._denomination_values: List[float] = [
                 2.00,
                 1.00,
@@ -622,7 +612,6 @@ class CoinScanApp(tk.Tk):
                 lbl_sum.grid(row=idx, column=2, sticky="ew")
                 rows.append((lbl_denom, lbl_qty, lbl_sum))
 
-            # total row
             total_label = tk.Label(
                 self.denominations_frame,
                 text="Total",
@@ -641,8 +630,10 @@ class CoinScanApp(tk.Tk):
                 anchor="e",
                 padx=6,
             )
-            total_label.grid(row=len(self._denomination_values) + 1, column=0, sticky="ew")
-            # span qty column empty space
+            total_label.grid(
+                row=len(self._denomination_values) + 1, column=0, sticky="ew"
+            )
+
             empty_span = tk.Label(
                 self.denominations_frame,
                 text="",
@@ -652,16 +643,17 @@ class CoinScanApp(tk.Tk):
                 anchor="center",
                 padx=6,
             )
-            empty_span.grid(row=len(self._denomination_values) + 1, column=1, sticky="ew")
-            total_value_label.grid(row=len(self._denomination_values) + 1, column=2, sticky="ew")
+            empty_span.grid(
+                row=len(self._denomination_values) + 1, column=1, sticky="ew"
+            )
+            total_value_label.grid(
+                row=len(self._denomination_values) + 1, column=2, sticky="ew"
+            )
 
-            # make columns expand evenly
             self.denominations_frame.grid_columnconfigure(0, weight=3)
             self.denominations_frame.grid_columnconfigure(1, weight=1)
             self.denominations_frame.grid_columnconfigure(2, weight=1)
 
-            # Pack at bottom of webcam_panel so it aligns to the webcam border.
-            # Use small horizontal padding so it doesn't overlap the webcam highlight.
             self.denominations_frame.pack(side="bottom", pady=(6, 10), padx=6, fill="x")
             self.denomination_widgets = {
                 "header": (header_denom, header_qty, header_sum),
@@ -867,7 +859,7 @@ class CoinScanApp(tk.Tk):
                     else COLORS.get("primary_btn_bg", COLORS["button_bg"])
                 ),
                 fg=(
-                    COLORS.get("font_btn_disabledFg")
+                    COLORS.get("font_btn_disabled_fg")
                     if disabled
                     else COLORS["button_fg"]
                 ),
@@ -980,12 +972,21 @@ class CoinScanApp(tk.Tk):
             activeforeground=btn_fg,
         )
 
-        # Update denominations table colors if present
         try:
             if hasattr(self, "denomination_widgets"):
-                header_bg = COLORS.get("contrast_panel_bg") if self.high_contrast else COLORS["background"]
-                header_fg = COLORS.get("contrast_fg") if self.high_contrast else "#000000"
-                cell_bg = COLORS.get("contrast_bg") if self.high_contrast else COLORS.get("listbox_bg", "white")
+                header_bg = (
+                    COLORS.get("contrast_panel_bg")
+                    if self.high_contrast
+                    else COLORS["background"]
+                )
+                header_fg = (
+                    COLORS.get("contrast_fg") if self.high_contrast else "#000000"
+                )
+                cell_bg = (
+                    COLORS.get("contrast_bg")
+                    if self.high_contrast
+                    else COLORS.get("listbox_bg", "white")
+                )
                 cell_fg = COLORS.get("contrast_fg") if self.high_contrast else "black"
                 hdr_left, hdr_mid, hdr_right = self.denomination_widgets["header"]
                 try:
@@ -1001,7 +1002,7 @@ class CoinScanApp(tk.Tk):
                         right.config(bg=cell_bg, fg=cell_fg)
                     except Exception:
                         pass
-                # total row
+
                 try:
                     tleft, tright = self.denomination_widgets.get("total", (None, None))
                     if tleft:
@@ -1401,17 +1402,18 @@ class CoinScanApp(tk.Tk):
             total_value = self.get_total_value()
             self.total_label.config(text=f"TOTAL: €{total_value:.2f}")
 
-            # Update denominations table quantities and sums if present
             try:
-                if hasattr(self, "denomination_widgets") and hasattr(self, "_denomination_values"):
-                    # initialize counts
+                if hasattr(self, "denomination_widgets") and hasattr(
+                    self, "_denomination_values"
+                ):
+
                     counts: Dict[float, int] = {v: 0 for v in self._denomination_values}
                     for coin in self.detected_coins:
                         try:
                             v = round(float(coin.get("value", 0)), 2)
                         except Exception:
                             continue
-                        # direct match or nearest match within small epsilon
+
                         if v in counts:
                             counts[v] += 1
                         else:
@@ -1420,20 +1422,24 @@ class CoinScanApp(tk.Tk):
                                     counts[dv] += 1
                                     break
 
-                    # update labels
                     for idx, dv in enumerate(self._denomination_values):
                         try:
-                            left, qty_lbl, sum_lbl = self.denomination_widgets["rows"][idx]
+                            left, qty_lbl, sum_lbl = self.denomination_widgets["rows"][
+                                idx
+                            ]
                             qty_lbl.config(text=str(counts.get(dv, 0)))
                             sum_val = counts.get(dv, 0) * dv
                             sum_lbl.config(text=f"€{sum_val:.2f}")
                         except Exception:
                             continue
 
-                    # update total field in the table (use computed sum to avoid rounding drift)
                     try:
-                        total_label, total_value_label = self.denomination_widgets.get("total", (None, None))
-                        table_total = sum(counts.get(dv, 0) * dv for dv in self._denomination_values)
+                        total_label, total_value_label = self.denomination_widgets.get(
+                            "total", (None, None)
+                        )
+                        table_total = sum(
+                            counts.get(dv, 0) * dv for dv in self._denomination_values
+                        )
                         if total_value_label:
                             total_value_label.config(text=f"€{table_total:.2f}")
                     except Exception:
@@ -1445,7 +1451,9 @@ class CoinScanApp(tk.Tk):
 
 
 class CoinEditDialog:
-    def __init__(self, parent: tk.Widget, coin: Optional[Dict[str, Any]] = None) -> None:
+    def __init__(
+        self, parent: tk.Widget, coin: Optional[Dict[str, Any]] = None
+    ) -> None:
         self.parent = parent
         self.coin = coin
 

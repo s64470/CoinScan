@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 Size = Tuple[int, int]
 
-
+# HoughCircles parameters
 _HOUGH_DP = 1.2
 _HOUGH_MIN_DIST = 30
 _HOUGH_PARAM1 = 50
@@ -21,8 +21,11 @@ _HOUGH_PARAM2 = 16
 _HOUGH_MIN_RADIUS = 15
 _HOUGH_MAX_RADIUS = 90
 
+_CAMERA_INDEX = 0
+
 
 def classify_coin(mean_hue: float, radius: int) -> Tuple[float, str, str]:
+    """Classify a coin by hue and radius. Returns (value, label, colour_label)."""
     if 18 < mean_hue < 35:
         colour_label = "Gold"
     elif 8 < mean_hue <= 18:
@@ -58,17 +61,20 @@ def centre_coins(
     circles: np.ndarray | Sequence[Tuple[float, float, float]],
     frame_shape: Tuple[int, int, int],
 ) -> List[Tuple[int, int, int]]:
+    """Return circles centred within a tolerance around the image centre."""
     if circles is None:
         return []
 
     arr = np.asarray(circles)
 
+    # HoughCircles sometimes returns a 3D array with shape (1, N, 3)
     if arr.ndim == 3 and arr.shape[0] == 1:
         arr = arr[0]
 
+    # Coerce to integer coordinates robustly
     try:
         arr = np.rint(arr).astype(int)
-    except Exception:
+    except (ValueError, TypeError):
         try:
             arr = np.array([[int(x), int(y), int(r)] for x, y, r in arr], dtype=int)
         except Exception:
@@ -76,7 +82,8 @@ def centre_coins(
             return []
 
     height, width = frame_shape[:2]
-    cx, cy = width // 2, height // 2
+    cx = width // 2
+    cy = height // 2
     tolx = int(width * 0.2)
     toly = int(height * 0.2)
 
@@ -97,25 +104,26 @@ def update_recognition(
     current_lang: str,
     on_results: Optional[Callable[[List[Tuple[float, str]]], None]] = None,
 ) -> None:
-
+    """Capture a single frame from the camera, detect the central coin, classify it,
+    update UI elements and return results via callback or UI labels."""
+    # Best-effort disable of scan button
     try:
         scan_button.config(state="disabled")
     except Exception:
         logger.debug("Failed to disable scan button", exc_info=True)
 
     def stream() -> None:
-        def ui(callable_obj: Callable, *args, **kwargs) -> None:
-
+        def run_on_ui(callable_obj: Callable, *args, **kwargs) -> None:
+            """Invoke callable on the UI thread if possible, otherwise call directly."""
             try:
-                recognition.after(0, lambda: callable_obj(*args, **kwargs))
-            except Exception:
-                try:
+                if hasattr(recognition, "after") and callable(recognition.after):
+                    recognition.after(0, lambda: callable_obj(*args, **kwargs))
+                else:
                     callable_obj(*args, **kwargs)
-                except Exception:
-                    logger.debug("Failed to run UI callable", exc_info=True)
+            except Exception:
+                logger.debug("Failed to run UI callable", exc_info=True)
 
         def set_webcam_image(pil_img: Image.Image) -> None:
-
             try:
                 imgtk = ImageTk.PhotoImage(image=pil_img)
                 webcam_label.imgtk = imgtk
@@ -123,18 +131,16 @@ def update_recognition(
                 try:
                     scan_button.config(text=get_text(current_lang, "rescan", "Rescan"))
                 except Exception:
-
-                    pass
+                    # Non-critical: not all callers may provide a configurable scan_button
+                    logger.debug("Failed to set scan button text", exc_info=True)
             except Exception:
                 logger.debug("Failed to set webcam image", exc_info=True)
 
         def compute_mean_hue_from_mask(
             frame_bgr: np.ndarray, mask: np.ndarray
         ) -> float:
-
             try:
                 coin_hsv = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2HSV)
-
                 coin_hue = coin_hsv[:, :, 0][mask == 255].astype(np.float64)
                 return float(np.mean(coin_hue)) if coin_hue.size > 0 else 0.0
             except Exception:
@@ -144,7 +150,6 @@ def update_recognition(
         def annotate_image(
             frame_rgb: np.ndarray, detected_circle: Tuple[int, int, int]
         ) -> Image.Image:
-
             img = Image.fromarray(
                 cv2.resize(frame_rgb, current_size, interpolation=cv2.INTER_LINEAR)
             )
@@ -160,7 +165,6 @@ def update_recognition(
                 r_s = max(1, int(detected_circle[2] * scale))
 
                 blur_radius = max(15, r_s // 2)
-
                 kernel = max(3, (int(blur_radius) // 2) * 2 + 1)
                 blurred = img.filter(ImageFilter.MedianFilter(size=kernel))
 
@@ -191,12 +195,12 @@ def update_recognition(
 
         cap: Optional[cv2.VideoCapture] = None
         try:
-            cap = cv2.VideoCapture(0)
+            cap = cv2.VideoCapture(_CAMERA_INDEX)
             cap.set(cv2.CAP_PROP_FRAME_WIDTH, int(current_size[0]))
             cap.set(cv2.CAP_PROP_FRAME_HEIGHT, int(current_size[1]))
 
             if not cap.isOpened():
-                ui(
+                run_on_ui(
                     recognition.insert,
                     "end",
                     get_text(current_lang, "camera_fail", "Camera open failed"),
@@ -205,7 +209,7 @@ def update_recognition(
 
             ret, frame = cap.read()
             if not ret or frame is None:
-                ui(
+                run_on_ui(
                     recognition.insert,
                     "end",
                     get_text(current_lang, "frame_fail", "Frame read failed"),
@@ -226,7 +230,7 @@ def update_recognition(
                 maxRadius=_HOUGH_MAX_RADIUS,
             )
 
-            ui(recognition.delete, 0, "end")
+            run_on_ui(recognition.delete, 0, "end")
             total = 0.0
             results: List[Tuple[float, str]] = []
             detected_circle: Optional[Tuple[int, int, int]] = None
@@ -234,7 +238,6 @@ def update_recognition(
             if circles is not None:
                 centered = centre_coins(circles, frame.shape)
                 if centered:
-
                     x, y, r = max(centered, key=lambda c: c[2])
 
                     mask = np.zeros(gray.shape, dtype=np.uint8)
@@ -246,12 +249,12 @@ def update_recognition(
                     results.append((value, label))
 
                     if on_results is None:
-                        ui(recognition.insert, "end", label)
+                        run_on_ui(recognition.insert, "end", label)
 
                     detected_circle = (int(x), int(y), int(r))
 
             if detected_circle is None:
-                ui(
+                run_on_ui(
                     recognition.insert,
                     "end",
                     get_text(current_lang, "no_coin", "No coin detected in centre."),
@@ -259,11 +262,11 @@ def update_recognition(
 
             if on_results is not None:
                 try:
-                    ui(on_results, results)
+                    run_on_ui(on_results, results)
                 except Exception:
                     logger.debug("Failed to call on_results", exc_info=True)
             else:
-                ui(total_label.config, text=format_total(current_lang, total))
+                run_on_ui(total_label.config, text=format_total(current_lang, total))
 
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             if detected_circle is not None:
@@ -273,7 +276,7 @@ def update_recognition(
                     cv2.resize(frame_rgb, current_size, interpolation=cv2.INTER_LINEAR)
                 )
 
-            ui(set_webcam_image, img)
+            run_on_ui(set_webcam_image, img)
         except Exception:
             logger.exception("Unexpected error in recognition stream")
         finally:
@@ -283,7 +286,7 @@ def update_recognition(
                 except Exception:
                     logger.debug("Failed to release camera", exc_info=True)
             try:
-                ui(scan_button.config, state="normal")
+                run_on_ui(scan_button.config, state="normal")
             except Exception:
                 logger.debug("Failed to re-enable scan button", exc_info=True)
 

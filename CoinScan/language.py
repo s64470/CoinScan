@@ -99,12 +99,24 @@ ABOUT_TEXTS: Dict[str, str] = {
 }
 
 _DECIMAL_QUANT = Decimal("0.01")
+_ZERO = Decimal("0.00")
 SUPPORTED_LANGS = frozenset(LANGUAGES.keys())
+
+__all__ = [
+    "DEFAULT_LANG",
+    "LANGUAGES",
+    "ABOUT_TEXTS",
+    "normalize_lang",
+    "get_strings",
+    "get_text",
+    "get_tooltip",
+    "format_total",
+]
 
 
 @lru_cache(maxsize=32)
 def normalize_lang(lang: Optional[str]) -> str:
-    if not lang or not isinstance(lang, str):
+    if not isinstance(lang, str) or not lang:
         return DEFAULT_LANG
 
     primary = lang.split("-", 1)[0].split("_", 1)[0].lower()
@@ -117,8 +129,14 @@ def get_strings(lang: Optional[str]) -> Mapping[str, Any]:
     return MappingProxyType(LANGUAGES.get(code, LANGUAGES[DEFAULT_LANG]))
 
 
-def get_text(lang: Optional[str], key: str, default: str = "") -> str:
+def get_text(lang: Optional[str], key: str, default: Any = "") -> Any:
     return get_strings(lang).get(key, default)
+
+
+def get_tooltip(lang: Optional[str], tooltip_key: str, default: str = "") -> str:
+    strings = get_strings(lang)
+    tooltips = strings.get("tooltips", {})
+    return tooltips.get(tooltip_key, default)
 
 
 def _to_decimal(amount: Any) -> Decimal:
@@ -129,7 +147,7 @@ def _to_decimal(amount: Any) -> Decimal:
             d = Decimal(str(amount))
         return d.quantize(_DECIMAL_QUANT, rounding=ROUND_HALF_UP)
     except (InvalidOperation, ValueError, TypeError):
-        return Decimal("0.00")
+        return _ZERO
 
 
 def format_total(lang: Optional[str], amount: Any) -> str:

@@ -1,4 +1,12 @@
-﻿from pathlib import Path
+﻿"""
+UI configuration constants for CoinScan.
+
+Provides color, font, size and icon path definitions used by the UI.
+Small cleanup: added module docstring, tighter typing, simple helpers,
+and minor refactors for clarity while preserving public API.
+"""
+
+from pathlib import Path
 from typing import Final, Mapping, Tuple, Union, Dict
 
 
@@ -51,6 +59,8 @@ FONTS: Final[Mapping[str, FontDef]] = {
     "footer": ("Segoe UI", 8),
 }
 
+# Directory containing icon assets. Use non-strict resolve to avoid errors
+# when the package lives in non-filesystem locations (editable installs, etc.).
 ICON_DIR: Final[Path] = (Path(__file__).parent / "icon").resolve(strict=False)
 
 _ICON_FILES: Final[Mapping[str, str]] = {
@@ -60,10 +70,19 @@ _ICON_FILES: Final[Mapping[str, str]] = {
     "prosegur_globe": "prosegur_globe.png",
 }
 
-ICON_PATHS: Final[Dict[str, str]] = {
-    key: str((ICON_DIR / filename).resolve(strict=False))
-    for key, filename in _ICON_FILES.items()
-}
+
+def _build_icon_paths(icon_dir: Path, mapping: Mapping[str, str]) -> Dict[str, str]:
+    """
+    Resolve icon file names to absolute paths (strings). Resolution is non-strict:
+    missing files will still yield a best-effort path string.
+    """
+    return {
+        key: str((icon_dir / filename).resolve(strict=False))
+        for key, filename in mapping.items()
+    }
+
+
+ICON_PATHS: Final[Dict[str, str]] = _build_icon_paths(ICON_DIR, _ICON_FILES)
 
 HIGH_CONTRAST_LOGOS: Final[Mapping[str, str]] = {
     "prosegur": ICON_PATHS.get("prosegur_globe", "")
@@ -94,24 +113,31 @@ CONTRAST_ICONS: Final[Mapping[str, str]] = {
 
 
 def icon_path(name: str) -> str:
+    """Return the resolved path string for an icon name, or empty string if unknown."""
     return ICON_PATHS.get(name, "")
 
 
 def icon_exists(name: str) -> bool:
+    """
+    Check whether the icon file for `name` exists on disk.
+    Returns False for unknown names.
+    """
     p = icon_path(name)
     if not p:
         return False
     try:
         return Path(p).is_file()
     except OSError:
+        # In case Path operations raise for unusual filesystems, treat as not existing.
         return False
 
 
 def available_icons() -> Tuple[str, ...]:
-    return tuple(ICON_PATHS.keys())
+    """Return a sorted tuple of available icon keys."""
+    return tuple(sorted(ICON_PATHS.keys()))
 
 
-__all__ = [
+__all__ = (
     "LOGO_WIDTH",
     "COLORS",
     "FONTS",
@@ -124,4 +150,4 @@ __all__ = [
     "icon_path",
     "icon_exists",
     "available_icons",
-]
+)
