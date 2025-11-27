@@ -312,6 +312,9 @@ class CoinScanApp(tk.Tk):
         )
         self.webcam_label.pack(pady=(10, 6))
 
+        # Added: denominations table below webcam_label
+        self._create_denominations_table()
+
         self.brand_right_photo: Optional[ImageTk.PhotoImage] = None
         self.brand_right_label: tk.Label = tk.Label(
             self.main_content, bd=0, bg=COLORS["background"]
@@ -519,6 +522,85 @@ class CoinScanApp(tk.Tk):
 
         Tooltip(self.webcam_label, tt("webcam"))
         Tooltip(self.results_panel, tt("results_panel"))
+
+    def _create_denominations_table(self) -> None:
+        """
+        Create a simple two-column table with visible lines and static denominations
+        (from €2.00 down to €0.01). Placed directly below the webcam label.
+        """
+        try:
+            self.denominations_frame = tk.Frame(
+                self.webcam_panel, bg=COLORS["background"]
+            )
+            # table header
+            hdr_font = FONTS.get("button", ("Segoe UI", 10, "bold"))
+            cell_font = FONTS.get("listbox", ("Segoe UI", 10))
+
+            header_denom = tk.Label(
+                self.denominations_frame,
+                text="Denomination",
+                font=hdr_font,
+                bd=1,
+                relief="solid",
+                anchor="w",
+                padx=6,
+            )
+            header_qty = tk.Label(
+                self.denominations_frame,
+                text="Qty",
+                font=hdr_font,
+                bd=1,
+                relief="solid",
+                anchor="center",
+                padx=6,
+            )
+
+            header_denom.grid(row=0, column=0, sticky="ew")
+            header_qty.grid(row=0, column=1, sticky="ew")
+
+            denominations = [
+                "€2.00",
+                "€1.00",
+                "€0.50",
+                "€0.20",
+                "€0.10",
+                "€0.05",
+                "€0.02",
+                "€0.01",
+            ]
+
+            rows: List[Tuple[tk.Label, tk.Label]] = []
+            for idx, d in enumerate(denominations, start=1):
+                lbl_denom = tk.Label(
+                    self.denominations_frame,
+                    text=d,
+                    font=cell_font,
+                    bd=1,
+                    relief="solid",
+                    anchor="w",
+                    padx=6,
+                )
+                lbl_qty = tk.Label(
+                    self.denominations_frame,
+                    text="0",
+                    font=cell_font,
+                    bd=1,
+                    relief="solid",
+                    anchor="center",
+                    padx=6,
+                )
+                lbl_denom.grid(row=idx, column=0, sticky="ew")
+                lbl_qty.grid(row=idx, column=1, sticky="ew")
+                rows.append((lbl_denom, lbl_qty))
+
+            # make columns expand evenly
+            self.denominations_frame.grid_columnconfigure(0, weight=3)
+            self.denominations_frame.grid_columnconfigure(1, weight=1)
+
+            self.denominations_frame.pack(pady=(6, 10), fill="x")
+            self.denomination_widgets = {"header": (header_denom, header_qty), "rows": rows}
+        except Exception as exc:
+            logger.debug("Failed to create denominations table: %s", exc, exc_info=True)
 
     def update_flag_buttons(self) -> None:
         try:
@@ -828,6 +910,28 @@ class CoinScanApp(tk.Tk):
             activebackground=COLORS.get("primary_btn_hover", btn_bg),
             activeforeground=btn_fg,
         )
+
+        # Update denominations table colors if present
+        try:
+            if hasattr(self, "denomination_widgets"):
+                header_bg = COLORS.get("contrast_panel_bg") if self.high_contrast else COLORS["background"]
+                header_fg = COLORS.get("contrast_fg") if self.high_contrast else "#000000"
+                cell_bg = COLORS.get("contrast_bg") if self.high_contrast else COLORS.get("listbox_bg", "white")
+                cell_fg = COLORS.get("contrast_fg") if self.high_contrast else "black"
+                hdr_left, hdr_right = self.denomination_widgets["header"]
+                try:
+                    hdr_left.config(bg=header_bg, fg=header_fg)
+                    hdr_right.config(bg=header_bg, fg=header_fg)
+                except Exception:
+                    pass
+                for left, right in self.denomination_widgets["rows"]:
+                    try:
+                        left.config(bg=cell_bg, fg=cell_fg)
+                        right.config(bg=cell_bg, fg=cell_fg)
+                    except Exception:
+                        pass
+        except Exception:
+            logger.debug("Failed to update denominations table colors", exc_info=True)
 
         try:
             if hasattr(self, "font_dec_btn") and hasattr(self, "font_inc_btn"):
